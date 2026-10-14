@@ -11,6 +11,7 @@ import { hasSpecies } from "../engine/data.js";
 import { store } from "./storage.js";
 import { hasTrophy, pointsEarned } from "../engine/achievements.js";
 import { type Buy, buySkill, totalCost, validTree } from "../engine/skills.js";
+import { type Lang, isLang } from "../i18n/index.js";
 
 const RUN_KEY = "beast-tourney.run.v1";
 const PROFILE_KEY = "beast-tourney.profile.v1";
@@ -43,6 +44,8 @@ export interface Profile {
   sfxVolume: number;
   /** Screen shake on heavy hits. */
   shake: boolean;
+  /** The language chosen in the settings; null until the player chooses, and then the browser's decides. */
+  lang: Lang | null;
   /** Battle playback speed: 1, 2 or 4. */
   speed: number;
   runs: number;
@@ -62,6 +65,7 @@ const emptyProfile = (): Profile => ({
   musicVolume: 0.5,
   sfxVolume: 0.8,
   shake: true,
+  lang: null,
   speed: 1,
   runs: 0,
   seenHelp: false,
@@ -106,6 +110,7 @@ export function parseProfile(text: string | null): Profile {
     if (typeof raw.seenHelp === "boolean") base.seenHelp = raw.seenHelp;
     if (typeof raw.sfxVolume === "number" && raw.sfxVolume >= 0 && raw.sfxVolume <= 1) base.sfxVolume = raw.sfxVolume;
     if (typeof raw.shake === "boolean") base.shake = raw.shake;
+    if (isLang(raw.lang)) base.lang = raw.lang;
     if (raw.speed === 1 || raw.speed === 2 || raw.speed === 4) base.speed = raw.speed;
     if (Array.isArray(raw.records)) base.records = raw.records.map(validRecord).filter((r): r is RunRecord => r !== null).slice(0, MAX_RECORDS);
     if (Array.isArray(raw.trophies)) base.trophies = [...new Set(raw.trophies.filter((t): t is string => typeof t === "string" && hasTrophy(t)))];

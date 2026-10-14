@@ -5,6 +5,7 @@
  */
 
 import { type BattleResult, type Outcome, simulateBattle } from "./battle.js";
+import { t } from "../i18n/index.js";
 import { hasSkill } from "./skills.js";
 import { BOONS, FACTION_DEFS, RELICS, SPECIES_LIST, bondNeed, hasOath, relic as relicDef, species as speciesDef } from "./data.js";
 import { MAX_ROUNDS, enemyTeam, isBossRound, tierCap } from "./enemy.js";
@@ -76,7 +77,7 @@ const fail = (error: string): Result => ({ ok: false, error });
 const clone = (run: Run): Run => structuredClone(run);
 const holds = (run: Run, id: string): boolean => run.boons.includes(id);
 const perk = (run: Run, id: string): boolean => run.perks.includes(id);
-const blocked = (run: Run): Result | null => (run.phase !== "shop" ? fail("The run is over.") : run.pendingBoons ? fail("Choose your reward first.") : null);
+const blocked = (run: Run): Result | null => (run.phase !== "shop" ? fail(t("The run is over.")) : run.pendingBoons ? fail(t("Choose your reward first.")) : null);
 
 // What a boon changes in the shop, in one place so the UI shows the same numbers the rules use.
 export const offerSlots = (run: Run): number => Math.min(5, offerCount(run.round) + (holds(run, "market") ? 1 : 0) + (perk(run, "early-bird") && run.round <= 2 ? 1 : 0));
@@ -214,7 +215,7 @@ export function roll(run: Run): Result {
   const stop = blocked(run);
   if (stop) return stop;
   const cost = rollCost(run);
-  if (run.gold < cost) return fail("Not enough gold to roll.");
+  if (run.gold < cost) return fail(t("Not enough gold to roll."));
   const next = clone(run);
   if (cost === 0) next.freeRolls--;
   else next.gold -= cost;
@@ -230,7 +231,7 @@ export function toggleFreeze(run: Run, kind: "creature" | "relic", index: number
   const next = clone(run);
   const list = kind === "creature" ? next.offers : next.relics;
   const item = list[index];
-  if (!item) return fail("Nothing there to freeze.");
+  if (!item) return fail(t("Nothing there to freeze."));
   item.frozen = !item.frozen;
   return { ok: true, run: next, events: [] };
 }
@@ -253,11 +254,11 @@ export function buy(run: Run, offerIndex: number, slot: number): Result {
   const stop = blocked(run);
   if (stop) return stop;
   const offer = run.offers[offerIndex];
-  if (!offer) return fail("That creature is no longer for sale.");
-  if (slot < 0 || slot >= SLOTS) return fail("No such slot.");
-  if (run.gold < BUY_COST) return fail("Not enough gold.");
+  if (!offer) return fail(t("That creature is no longer for sale."));
+  if (slot < 0 || slot >= SLOTS) return fail(t("No such slot."));
+  if (run.gold < BUY_COST) return fail(t("Not enough gold."));
   const occupant = run.team[slot];
-  if (occupant && occupant.sp !== offer.sp) return fail("That slot is taken by a different creature.");
+  if (occupant && occupant.sp !== offer.sp) return fail(t("That slot is taken by a different creature."));
   const next = clone(run);
   next.gold -= BUY_COST;
   next.offers[offerIndex] = null;
@@ -273,12 +274,12 @@ export function buyRelic(run: Run, relicIndex: number, slot: number): Result {
   const stop = blocked(run);
   if (stop) return stop;
   const offer = run.relics[relicIndex];
-  if (!offer) return fail("That relic is no longer for sale.");
+  if (!offer) return fail(t("That relic is no longer for sale."));
   const unit = run.team[slot];
-  if (!unit) return fail("Pick a creature to carry the relic.");
+  if (!unit) return fail(t("Pick a creature to carry the relic."));
   const def = relicDef(offer.id);
   const price = relicCost(run, def);
-  if (run.gold < price) return fail("Not enough gold.");
+  if (run.gold < price) return fail(t("Not enough gold."));
   const next = clone(run);
   next.gold -= price;
   next.relics[relicIndex] = null;
@@ -292,7 +293,7 @@ export function sell(run: Run, slot: number): Result {
   const stop = blocked(run);
   if (stop) return stop;
   const unit = run.team[slot];
-  if (!unit) return fail("Nothing to sell there.");
+  if (!unit) return fail(t("Nothing to sell there."));
   const next = clone(run);
   const sold = next.team[slot]!;
   const events: ShopEvent[] = [];
@@ -310,7 +311,7 @@ export function move(run: Run, from: number, to: number): Result {
   if (stop) return stop;
   if (from === to) return { ok: true, run, events: [] };
   const a = run.team[from];
-  if (!a || to < 0 || to >= SLOTS) return fail("Nothing to move.");
+  if (!a || to < 0 || to >= SLOTS) return fail(t("Nothing to move."));
   const next = clone(run);
   const events: ShopEvent[] = [];
   const b = next.team[to];
@@ -339,7 +340,7 @@ export function fight(run: Run): FightResult {
   const stop = blocked(run);
   if (stop && !stop.ok) return { ok: false, error: stop.error };
   const mine = teamUnits(run);
-  if (mine.length === 0) return { ok: false, error: "Field at least one creature." };
+  if (mine.length === 0) return { ok: false, error: t("Field at least one creature.") };
   const next = clone(run);
   const enemy = enemyTeam(next.seed, next.round, next.attempt, next.difficulty, next.oaths);
   const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons, oaths: next.oaths, perks: next.perks.filter((p) => perkActive(p, next.round)) });
@@ -374,7 +375,7 @@ function offerBoons(run: Run, round: number): string[] {
 
 /** After winning the tournament: carry on into rounds 13 and beyond. The run is not won any more, only survived. */
 export function continueEndless(run: Run): Result {
-  if (run.phase !== "won" || run.endless) return fail("Endless mode opens only after the tournament is won.");
+  if (run.phase !== "won" || run.endless) return fail(t("Endless mode opens only after the tournament is won."));
   const next = clone(run);
   next.endless = true;
   next.phase = "shop";
@@ -386,8 +387,8 @@ export function continueEndless(run: Run): Result {
 
 /** Take one of the offered boons. Effects that only matter once (a life, gold, a buff) land now; the rest apply from the next turn on. */
 export function chooseBoon(run: Run, id: string): Result {
-  if (run.phase !== "shop") return fail("The run is over.");
-  if (!run.pendingBoons?.includes(id)) return fail("That reward is not on offer.");
+  if (run.phase !== "shop") return fail(t("The run is over."));
+  if (!run.pendingBoons?.includes(id)) return fail(t("That reward is not on offer."));
   const next = clone(run);
   next.pendingBoons = null;
   next.boons.push(id);

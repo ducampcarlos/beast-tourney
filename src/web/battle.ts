@@ -5,13 +5,14 @@ import { FACTION_DEFS, boon as boonDef, relic as relicDef, species } from "../en
 import { bossName, isBossRound } from "../engine/enemy.js";
 import { type FightResult, LIVES, type Run } from "../engine/run.js";
 import { newTrophies } from "../engine/achievements.js";
-import { STATUS_TEXT, TRIGGER_TEXT, describeAbility } from "../engine/text.js";
+import { describeAbility, statusText, triggerText } from "../engine/text.js";
 import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import { burst, ring, shake, shoot } from "./fx.js";
 import type { Session } from "./session.js";
 import { award, flushTrophies } from "./toasts.js";
 import { COLOR, H, W, backdrop, button, fadeIn, floater, go, panel, text, type Button } from "./ui.js";
+import { t } from "../i18n/index.js";
 
 type OkFight = Extract<FightResult, { ok: true }>;
 
@@ -62,12 +63,12 @@ export class Battle extends Phaser.Scene {
     for (let y = BASE_Y - 56; y < BASE_Y + 128; y += 22) this.add.rectangle(W / 2, y, 4, 12, 0xf3e6c4, 0.2).setDepth(-5);
 
     panel(this, 0, 0, W, 54, "ui_ancient_brown").setDepth(-2);
-    text(this, 18, 26, `Round ${this.before.round}`, 28, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
+    text(this, 18, 26, t("Round {n}", { n: this.before.round }), 28, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
     const name = bossName(this.before.round);
-    text(this, W / 2, 26, name ? `BOSS: ${name}` : "Battle", 26, name ? COLOR.red : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0.5);
+    text(this, W / 2, 26, name ? t("BOSS: {name}", { name }) : t("Battle"), 26, name ? COLOR.red : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0.5);
 
-    this.speedButton = button(this, 770, 26, `Speed x${this.speed}`, () => this.cycleSpeed(), { w: 150, h: 38, size: 18, color: "blue" }) as Button;
-    this.skipButton = button(this, 886, 26, "Skip", () => this.skip(), { w: 100, h: 38, size: 18, color: "grey" }) as Button;
+    this.speedButton = button(this, 770, 26, t("Speed x{n}", { n: this.speed }), () => this.cycleSpeed(), { w: 150, h: 38, size: 18, color: "blue" }) as Button;
+    this.skipButton = button(this, 886, 26, t("Skip"), () => this.skip(), { w: 100, h: 38, size: 18, color: "grey" }) as Button;
     this.input.keyboard?.on("keydown-SPACE", () => this.cycleSpeed());
     this.input.keyboard?.on("keydown-ESC", () => this.skip());
 
@@ -82,7 +83,7 @@ export class Battle extends Phaser.Scene {
 
   private cycleSpeed(): void {
     this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 4 : 1;
-    this.speedButton.setLabel(`Speed x${this.speed}`);
+    this.speedButton.setLabel(t("Speed x{n}", { n: this.speed }));
     this.session.profile.speed = this.speed;
     this.session.saveProfile();
   }
@@ -130,27 +131,27 @@ export class Battle extends Phaser.Scene {
     const sp = species(v.spId);
     const def = FACTION_DEFS[sp.faction];
     const lines: Array<[string, number, string]> = [
-      [sp.name, 22, COLOR.dark],
-      [`${def.name}  ·  Lv ${v.level}  ·  ${v.atk}/${Math.max(0, v.hp)}`, 16, "#5a3a22"],
+      [t(sp.name), 22, COLOR.dark],
+      [t("{faction}  ·  Lv {level}  ·  {atk}/{hp}", { faction: t(def.name), level: v.level, atk: v.atk, hp: Math.max(0, v.hp) }), 16, "#5a3a22"],
     ];
     if (sp.ability) lines.push([describeAbility(sp.ability, v.level, sp.faction), 17, "#2a1f1a"]);
-    if (v.relicId) lines.push([`${relicDef(v.relicId).name}: ${relicDef(v.relicId).text}`, 15, "#1d4f7a"]);
-    for (const st of v.statusList) lines.push([STATUS_TEXT[st], 15, "#1d4f7a"]);
+    if (v.relicId) lines.push([`${t(relicDef(v.relicId).name)}: ${t(relicDef(v.relicId).text)}`, 15, "#1d4f7a"]);
+    for (const st of v.statusList) lines.push([statusText(st), 15, "#1d4f7a"]);
     const width = 250;
     const texts: Phaser.GameObjects.Text[] = [];
     let height = 14;
     for (const [content, size, color] of lines) {
-      const t = text(this, 0, 0, content, size, color, { wordWrap: { width: width - 24 }, lineSpacing: 2 }).setDepth(902);
-      texts.push(t);
-      height += t.height + 5;
+      const row = text(this, 0, 0, content, size, color, { wordWrap: { width: width - 24 }, lineSpacing: 2 }).setDepth(902);
+      texts.push(row);
+      height += row.height + 5;
     }
     const x = Phaser.Math.Clamp(v.x, width / 2 + 8, W - width / 2 - 8);
     const top = Math.max(64, v.y - 110 - height);
     const box = panel(this, x - width / 2, top, width, height + 10, "ui_ancient_tan").setDepth(901);
     let y = top + 12;
-    texts.forEach((t) => {
-      t.setPosition(x - width / 2 + 12, y);
-      y += t.height + 5;
+    texts.forEach((row) => {
+      row.setPosition(x - width / 2 + 12, y);
+      y += row.height + 5;
     });
     this.tip = [box, ...texts];
   }
@@ -234,7 +235,7 @@ export class Battle extends Phaser.Scene {
       const x = b.side === 0 ? 24 : W - 24;
       const y = 78 + perSide[b.side]! * 32;
       perSide[b.side]!++;
-      const tag = text(this, x, y, `${def.name} ${"I".repeat(b.need === 2 ? 1 : 2)}`, 24, color, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(b.side === 0 ? 0 : 1, 0.5).setDepth(300).setAlpha(0);
+      const tag = text(this, x, y, `${t(def.name)} ${"I".repeat(b.need === 2 ? 1 : 2)}`, 24, color, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(b.side === 0 ? 0 : 1, 0.5).setDepth(300).setAlpha(0);
       this.bondTags.push(tag);
       this.tweens.add({ targets: tag, alpha: 1, duration: 250 / this.speed });
       this.audio.sfx("bell", 0.25, 1.4);
@@ -242,7 +243,7 @@ export class Battle extends Phaser.Scene {
     let boonRow = 0;
     for (const e of events) {
       if (e.t !== "boon") continue;
-      const tag = text(this, 24, 78 + (perSide[0]! + boonRow++) * 32, `Boon: ${boonDef(e.id).name}`, 24, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5).setDepth(300).setAlpha(0);
+      const tag = text(this, 24, 78 + (perSide[0]! + boonRow++) * 32, t("Boon: {name}", { name: t(boonDef(e.id).name) }), 24, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5).setDepth(300).setAlpha(0);
       this.bondTags.push(tag);
       this.tweens.add({ targets: tag, alpha: 1, duration: 250 / this.speed });
     }
@@ -291,7 +292,7 @@ export class Battle extends Phaser.Scene {
     const v = this.view(uid);
     if (!v) return;
     ring(this, v.x, v.y, 0x6fd0ff, 2.4);
-    floater(this, v.x, v.y - 50, "BLOCKED", COLOR.blue, 24, 600);
+    floater(this, v.x, v.y - 50, t("BLOCKED"), COLOR.blue, 24, 600);
     v.setStatuses([]);
     this.audio.sfx("glass", 0.5);
   }
@@ -299,7 +300,7 @@ export class Battle extends Phaser.Scene {
   private applyVenom(uid: number): void {
     const v = this.view(uid);
     if (!v) return;
-    floater(this, v.x, v.y - 60, "VENOM!", COLOR.green, 26, 600);
+    floater(this, v.x, v.y - 60, t("VENOM!"), COLOR.green, 26, 600);
     v.tintFlash(0x6bff7a, 300);
     this.audio.sfx("scratch", 0.4);
   }
@@ -310,7 +311,7 @@ export class Battle extends Phaser.Scene {
         const v = this.view(e.uid);
         if (!v) return;
         v.pulse(1.2, 120);
-        floater(this, v.x, v.y - 74, TRIGGER_TEXT[e.trigger], "#ffffff", 16, 650);
+        floater(this, v.x, v.y - 74, triggerText(e.trigger), "#ffffff", 16, 650);
         this.audio.sfx("pluck", 0.3, 1.2);
         await this.wait(260);
         return;
@@ -319,7 +320,7 @@ export class Battle extends Phaser.Scene {
         const v = this.view(e.uid);
         if (!v) return;
         v.setStats(Math.max(0, v.atk + e.atk), v.hp + e.hp);
-        const label = e.atk && e.hp ? `+${e.atk}/+${e.hp}` : e.atk ? `+${e.atk} atk` : `+${e.hp} hp`;
+        const label = e.atk && e.hp ? `+${e.atk}/+${e.hp}` : e.atk ? t("+{n} atk", { n: e.atk }) : t("+{n} hp", { n: e.hp });
         floater(this, v.x, v.y - 56, label, COLOR.green, 22, 600);
         v.tintFlash(0x9dffb0);
         burst(this, v.x, v.y, "fx_star_04", 5, 0x9dffb0, 90);
@@ -398,13 +399,13 @@ export class Battle extends Phaser.Scene {
     const { outcome } = this.result.battle;
     const after = this.result.run;
     const final = after.phase !== "shop";
-    for (const t of this.bondTags) t.destroy();
+    for (const tag of this.bondTags) tag.destroy();
 
     const bonds = this.result.battle.steps.flatMap((st) => st.events).filter((e): e is Extract<BattleEvent, { t: "bond" }> => e.t === "bond" && e.side === 0).map((e) => e.need);
     award(this.registry, newTrophies(this.session.profile.trophies, { battle: { outcome, round: this.before.round, bonds }, team: after.team, boons: after.boons, ...(after.endless ? { depth: after.round } : {}) }));
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(800);
     this.tweens.add({ targets: dim, fillAlpha: 0.55, duration: 300 });
-    const title = outcome === "win" ? "VICTORY!" : outcome === "lose" ? "DEFEAT" : "DRAW";
+    const title = outcome === "win" ? t("VICTORY!") : outcome === "lose" ? t("DEFEAT") : t("DRAW");
     const color = outcome === "win" ? COLOR.gold : outcome === "lose" ? COLOR.red : COLOR.cream;
     if (outcome === "win") this.audio.music("victory", false);
     else if (outcome === "lose") this.audio.music("defeat", false);
@@ -414,11 +415,11 @@ export class Battle extends Phaser.Scene {
     const head = text(this, W / 2, 196, title, 64, color, { stroke: "#2a1f1a", strokeThickness: 12 }).setOrigin(0.5).setDepth(820).setScale(0.3).setAlpha(0);
     const lines: string[] = [];
     const boss = isBossRound(this.before.round);
-    if (outcome === "win") lines.push(boss ? `${bossName(this.before.round)} is beaten!` : `Round ${this.before.round} cleared.`);
-    else if (outcome === "lose") lines.push(after.lives < this.before.lives ? `You lose a life. ${after.lives} left.` : "Defeated.");
-    else lines.push(after.lives < this.before.lives ? "A drawn final counts against you. You lose a life." : "Neither side prevails. No life lost.");
-    if (after.phase === "won") lines.push("You are the champion of the Tourney!");
-    if (after.phase === "lost") lines.push("Your run ends here.");
+    if (outcome === "win") lines.push(boss ? t("{name} is beaten!", { name: bossName(this.before.round) ?? "" }) : t("Round {n} cleared.", { n: this.before.round }));
+    else if (outcome === "lose") lines.push(after.lives < this.before.lives ? t("You lose a life. {n} left.", { n: after.lives }) : t("Defeated."));
+    else lines.push(after.lives < this.before.lives ? t("A drawn final counts against you. You lose a life.") : t("Neither side prevails. No life lost."));
+    if (after.phase === "won") lines.push(t("You are the champion of the Tourney!"));
+    if (after.phase === "lost") lines.push(t("Your run ends here."));
     const body = text(this, W / 2, 262, lines.join("\n"), 24, COLOR.cream, { align: "center", wordWrap: { width: 440 }, lineSpacing: 6 }).setOrigin(0.5, 0).setDepth(820).setAlpha(0);
     this.tweens.add({ targets: [box, body], alpha: 1, duration: 260 });
     this.tweens.add({ targets: head, scale: 1, alpha: 1, duration: 360, ease: "Back.easeOut" });
@@ -434,7 +435,7 @@ export class Battle extends Phaser.Scene {
       if (i === after.lives && after.lives < this.before.lives) this.tweens.add({ targets: h, scale: 3.6, alpha: 0.2, duration: 600, yoyo: false, delay: 500 });
     }
 
-    const label = final ? (after.phase === "won" ? "Celebrate!" : "Continue") : "Continue";
+    const label = final ? (after.phase === "won" ? t("Celebrate!") : t("Continue")) : t("Continue");
     button(this, W / 2, 392, label, () => this.next(), { w: 240, h: 52, color: "green", size: 28 }).setDepth(830);
     this.input.keyboard?.once("keydown-ENTER", () => this.next());
     this.input.keyboard?.once("keydown-SPACE", () => this.next());

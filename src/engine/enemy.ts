@@ -7,6 +7,7 @@
 import { FACTION_DEFS, RELICS, SPECIES_LIST, relic, species } from "./data.js";
 import { Rng, hashSeed } from "./rng.js";
 import { type Difficulty, FACTIONS, LEVEL_EXP, type Unit } from "./types.js";
+import { t } from "../i18n/index.js";
 
 export const MAX_ROUNDS = 12;
 export const BOSS_ROUNDS: readonly number[] = [4, 8, 12];
@@ -54,7 +55,7 @@ const BOSS_CASTS: Record<number, { cast: Slot[]; name: string }> = {
 export function bossName(round: number): string | undefined {
   if (!isBossRound(round)) return undefined;
   const base = BOSS_CASTS[bossKey(round)]!.name;
-  return round > MAX_ROUNDS ? `${base}, Reborn` : base;
+  return round > MAX_ROUNDS ? t("{name}, Reborn", { name: t(base) }) : t(base);
 }
 
 export function enemyTeam(seed: number, round: number, attempt: number, difficulty: Difficulty, oaths: readonly string[] = []): Unit[] {

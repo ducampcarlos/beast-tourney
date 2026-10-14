@@ -497,7 +497,7 @@ await test("the save can be exported to a file and imported again, and a bad fil
   await page.reload();
   await scene(page, "Menu");
   await click(page, { x: 580, y: 470 }); // Settings
-  const [download] = await Promise.all([page.waitForEvent("download"), click(page, { x: 492, y: 340 })]); // Export
+  const [download] = await Promise.all([page.waitForEvent("download"), click(page, { x: 492, y: 372 })]); // Export
   assert.match(download.suggestedFilename(), /^beast-tourney-save-\d{4}-\d{2}-\d{2}\.json$/);
   const text = await readFile(await download.path(), "utf8");
   const file = JSON.parse(text);
@@ -518,7 +518,7 @@ await test("the save can be exported to a file and imported again, and a bad fil
   page.on("filechooser", (c) => wanted?.(c));
   const choose = async (buffer) => {
     const next = new Promise((resolve) => (wanted = resolve));
-    await click(page, { x: 642, y: 340 }); // Import
+    await click(page, { x: 642, y: 372 }); // Import
     const chooser = await next;
     await chooser.setFiles({ name: "save.json", mimeType: "application/json", buffer: Buffer.from(buffer) });
     await page.waitForTimeout(400);

@@ -1,6 +1,7 @@
 /** Small drawing helpers shared by the scenes: layout constants, fonts, panels, buttons and procedural textures. */
 
 import Phaser from "phaser";
+import { t, tn } from "../i18n/index.js";
 
 export const W = 960;
 export const H = 540;
@@ -25,9 +26,9 @@ export function lighten(color: number, amount = 0.45): string {
 }
 
 export function text(scene: Phaser.Scene, x: number, y: number, content: string, size = 24, color: string = COLOR.cream, extra: Phaser.Types.GameObjects.Text.TextStyle = {}): Phaser.GameObjects.Text {
-  const t = scene.add.text(x, y, content, { fontFamily: FONT, fontSize: `${size}px`, color, ...extra });
-  t.setResolution(1);
-  return t;
+  const label = scene.add.text(x, y, content, { fontFamily: FONT, fontSize: `${size}px`, color, ...extra });
+  label.setResolution(1);
+  return label;
 }
 
 /** A 9-slice panel from the Kenney pixel UI pack (48px sprites with 16px corners), drawn at half size for crisp borders. */
@@ -120,14 +121,14 @@ export function makeTextures(scene: Phaser.Scene): void {
 }
 
 export function toast(scene: Phaser.Scene, message: string, color: string = COLOR.red): void {
-  const t = text(scene, W / 2, 96, message, 24, color, { stroke: "#1d1a2b", strokeThickness: 5 }).setOrigin(0.5).setDepth(1000).setAlpha(0);
-  scene.tweens.add({ targets: t, alpha: 1, y: 84, duration: 150, yoyo: false, onComplete: () => scene.tweens.add({ targets: t, alpha: 0, y: 70, delay: 900, duration: 300, onComplete: () => t.destroy() }) });
+  const note = text(scene, W / 2, 96, message, 24, color, { stroke: "#1d1a2b", strokeThickness: 5 }).setOrigin(0.5).setDepth(1000).setAlpha(0);
+  scene.tweens.add({ targets: note, alpha: 1, y: 84, duration: 150, yoyo: false, onComplete: () => scene.tweens.add({ targets: note, alpha: 0, y: 70, delay: 900, duration: 300, onComplete: () => note.destroy() }) });
 }
 
 /** Floating number or word that drifts up and fades. */
 export function floater(scene: Phaser.Scene, x: number, y: number, message: string, color: string, size = 28, depth = 500): void {
-  const t = text(scene, x, y, message, size, color, { stroke: "#1d1a2b", strokeThickness: 5 }).setOrigin(0.5).setDepth(depth);
-  scene.tweens.add({ targets: t, y: y - 38, alpha: 0, duration: 900, ease: "Cubic.easeOut", onComplete: () => t.destroy() });
+  const note = text(scene, x, y, message, size, color, { stroke: "#1d1a2b", strokeThickness: 5 }).setOrigin(0.5).setDepth(depth);
+  scene.tweens.add({ targets: note, y: y - 38, alpha: 0, duration: 900, ease: "Cubic.easeOut", onComplete: () => note.destroy() });
 }
 
 /** Dungeon floor and wall, drawn once as a backdrop. */
@@ -155,13 +156,13 @@ export function overlay(scene: Phaser.Scene, title: string, lines: string[], onC
   const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setDepth(depth).setInteractive();
   const height = 440;
   const box = panel(scene, W / 2 - width / 2, H / 2 - height / 2, width, height, "ui_ancient_brown").setDepth(depth + 1);
-  const head = text(scene, W / 2, H / 2 - height / 2 + 36, title, 36, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(depth + 2);
-  const body = text(scene, W / 2 - width / 2 + 36, H / 2 - height / 2 + 76, lines.join("\n\n"), 20, COLOR.cream, { wordWrap: { width: width - 72 }, lineSpacing: 3, stroke: "#2a1f1a", strokeThickness: 3 }).setDepth(depth + 2);
+  const head = text(scene, W / 2, H / 2 - height / 2 + 36, t(title), 36, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(depth + 2);
+  const body = text(scene, W / 2 - width / 2 + 36, H / 2 - height / 2 + 76, lines.map((line) => t(line)).join("\n\n"), 20, COLOR.cream, { wordWrap: { width: width - 72 }, lineSpacing: 3, stroke: "#2a1f1a", strokeThickness: 3 }).setDepth(depth + 2);
   const close = () => {
     for (const o of objects) o.destroy();
     onClose?.();
   };
-  const b = button(scene, W / 2, H / 2 + height / 2 - 40, "Got it", close, { w: 200, h: 48, color: "green", size: 24 }).setDepth(depth + 3);
+  const b = button(scene, W / 2, H / 2 + height / 2 - 40, t("Got it"), close, { w: 200, h: 48, color: "green", size: 24 }).setDepth(depth + 3);
   objects.push(dim, box, head, body, b);
   scene.input.keyboard?.once("keydown-ESC", close);
   return close;

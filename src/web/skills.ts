@@ -6,6 +6,7 @@ import type { Audio } from "./audio.js";
 import type { Session } from "./session.js";
 import { flushTrophies } from "./toasts.js";
 import { COLOR, W, backdrop, button, fadeIn, go, panel, text, toast } from "./ui.js";
+import { t, tn } from "../i18n/index.js";
 
 const COL_W = 300;
 const CARD_H = 82;
@@ -27,9 +28,9 @@ export class Skills extends Phaser.Scene {
     fadeIn(this);
     backdrop(this, 1.2);
     panel(this, 0, 0, W, 54, "ui_ancient_brown");
-    text(this, 18, 26, "Skill Tree", 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
-    button(this, 700, 27, "Respec", () => this.respec(), { w: 130, h: 40, color: "yellow", size: 20 });
-    button(this, 880, 27, "Back", () => go(this, "Menu"), { w: 130, h: 40, color: "grey", size: 20 });
+    text(this, 18, 26, t("Skill Tree"), 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
+    button(this, 700, 27, t("Respec"), () => this.respec(), { w: 130, h: 40, color: "yellow", size: 20 });
+    button(this, 880, 27, t("Back"), () => go(this, "Menu"), { w: 130, h: 40, color: "grey", size: 20 });
     panel(this, 12, 64, W - 24, 464, "ui_ancient_brown");
     this.draw();
     flushTrophies(this);
@@ -41,7 +42,7 @@ export class Skills extends Phaser.Scene {
   }
 
   private respec(): void {
-    if (this.session.profile.skills.length === 0) return toast(this, "Nothing to take back yet.", COLOR.muted);
+    if (this.session.profile.skills.length === 0) return toast(this, t("Nothing to take back yet."), COLOR.muted);
     this.session.forgetSkills();
     (this.registry.get("audio") as Audio).sfx("select", 0.5);
     this.draw();
@@ -53,14 +54,14 @@ export class Skills extends Phaser.Scene {
     const owned = this.session.profile.skills;
     const earned = pointsEarned(this.session.profile.trophies);
     const left = this.session.points();
-    this.keep(text(this, 190, 22, `${left} point${left === 1 ? "" : "s"} to spend`, 22, left > 0 ? COLOR.gold : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
-    this.keep(text(this, 190, 42, `${earned} earned from challenges`, 12, COLOR.muted).setOrigin(0, 0.5));
+    this.keep(text(this, 190, 22, tn(left, "{n} point to spend", "{n} points to spend"), 22, left > 0 ? COLOR.gold : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
+    this.keep(text(this, 190, 42, t("{n} earned from challenges", { n: earned }), 12, COLOR.muted).setOrigin(0, 0.5));
 
     BRANCHES.forEach((branch, col) => {
       const x = 22 + col * (COL_W + 12);
       const info = BRANCH_INFO[branch];
-      this.keep(text(this, x + COL_W / 2, 84, info.name, 26, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0.5));
-      this.keep(text(this, x + COL_W / 2, 112, info.blurb, 15, COLOR.muted).setOrigin(0.5));
+      this.keep(text(this, x + COL_W / 2, 84, t(info.name), 26, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0.5));
+      this.keep(text(this, x + COL_W / 2, 112, t(info.blurb), 15, COLOR.muted).setOrigin(0.5));
       SKILLS.filter((s) => s.branch === branch).forEach((s, row) => this.card(s, x, TOP + row * (CARD_H + 6), owned, left));
     });
   }
@@ -76,9 +77,9 @@ export class Skills extends Phaser.Scene {
     const icon = this.keep(this.add.image(x + 34, y + CARD_H / 2, "dungeon", s.icon).setScale(3));
     if (!has && !open) icon.setTintFill(0x1a1410).setAlpha(0.8);
     else if (!has) icon.setAlpha(buyable ? 1 : 0.6);
-    this.keep(text(this, x + 66, y + 8, s.name, 19, has ? COLOR.gold : open ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
-    this.keep(text(this, x + 66, y + 32, open || has ? s.text : `Needs ${s.requires.map((r) => skill(r).name).join(" and ")}.`, 13, open || has ? COLOR.cream : COLOR.muted, { wordWrap: { width: COL_W - 80 }, lineSpacing: 1 }));
-    const tag = has ? "Owned" : `${s.cost} pts`;
+    this.keep(text(this, x + 66, y + 8, t(s.name), 19, has ? COLOR.gold : open ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
+    this.keep(text(this, x + 66, y + 32, open || has ? t(s.text) : t("Needs {names}.", { names: s.requires.map((r) => t(skill(r).name)).join(" " + t("and") + " ") }), 13, open || has ? COLOR.cream : COLOR.muted, { wordWrap: { width: COL_W - 80 }, lineSpacing: 1 }));
+    const tag = has ? t("Owned") : t("{n} pts", { n: s.cost });
     this.keep(text(this, x + COL_W - 10, y + 8, tag, 15, has ? COLOR.green : affordable ? COLOR.gold : COLOR.red, { stroke: "#2a1f1a", strokeThickness: 3 }).setOrigin(1, 0));
     box.setInteractive({ useHandCursor: !has });
     box.on("pointerover", () => !has && box.setFillStyle(buyable ? 0x4b3b24 : fill, 0.95));

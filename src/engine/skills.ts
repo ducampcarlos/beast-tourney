@@ -6,6 +6,8 @@
  * (run.ts for the shop, battle.ts for the fight).
  */
 
+import { t } from "../i18n/index.js";
+
 export type Branch = "fortune" | "might" | "wisdom";
 export const BRANCHES: readonly Branch[] = ["fortune", "might", "wisdom"];
 
@@ -64,12 +66,12 @@ export type Buy = { ok: true; skills: string[] } | { ok: false; error: string };
 
 /** Spend points on one more skill. `points` is the total ever earned. */
 export function buySkill(owned: readonly string[], id: string, points: number): Buy {
-  if (!hasSkill(id)) return { ok: false, error: "No such skill." };
-  if (owned.includes(id)) return { ok: false, error: "You already have it." };
+  if (!hasSkill(id)) return { ok: false, error: t("No such skill.") };
+  if (owned.includes(id)) return { ok: false, error: t("You already have it.") };
   const def = skill(id);
   const missing = def.requires.filter((r) => !owned.includes(r));
-  if (missing.length > 0) return { ok: false, error: `Needs ${missing.map((m) => skill(m).name).join(" and ")} first.` };
+  if (missing.length > 0) return { ok: false, error: t("Needs {names} first.", { names: missing.map((m) => t(skill(m).name)).join(" " + t("and") + " ") }) };
   const left = points - totalCost(owned);
-  if (left < def.cost) return { ok: false, error: `It costs ${def.cost} points; you have ${Math.max(0, left)}.` };
+  if (left < def.cost) return { ok: false, error: t("It costs {cost} points; you have {left}.", { cost: def.cost, left: Math.max(0, left) }) };
   return { ok: true, skills: [...owned, id] };
 }

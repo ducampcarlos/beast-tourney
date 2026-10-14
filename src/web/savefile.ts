@@ -5,6 +5,7 @@
  * what comes out of the browser's storage.
  */
 
+import { t } from "../i18n/index.js";
 import { type Run } from "../engine/run.js";
 import { parseRun } from "../engine/save.js";
 import { type Profile, parseProfile } from "./session.js";
@@ -32,24 +33,24 @@ export function buildSave(profile: Profile, run: Run | null, now = new Date()): 
 export type Imported = { ok: true; profile: Profile; run: Run | null; exported: string } | { ok: false; error: string };
 
 export function parseSave(text: string): Imported {
-  if (text.length > MAX_SAVE_BYTES) return { ok: false, error: "That file is too big to be a save." };
+  if (text.length > MAX_SAVE_BYTES) return { ok: false, error: t("That file is too big to be a save.") };
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
-    return { ok: false, error: "That file is not a Beast Tourney save." };
+    return { ok: false, error: t("That file is not a Beast Tourney save.") };
   }
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, error: "That file is not a Beast Tourney save." };
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, error: t("That file is not a Beast Tourney save.") };
   const file = raw as Record<string, unknown>;
-  if (file.game !== SAVE_GAME) return { ok: false, error: "That file is not a Beast Tourney save." };
-  if (file.format !== SAVE_FORMAT) return { ok: false, error: "That save comes from a different version of the game." };
-  if (typeof file.profile !== "object" || file.profile === null || Array.isArray(file.profile)) return { ok: false, error: "That save has no progress in it." };
+  if (file.game !== SAVE_GAME) return { ok: false, error: t("That file is not a Beast Tourney save.") };
+  if (file.format !== SAVE_FORMAT) return { ok: false, error: t("That save comes from a different version of the game.") };
+  if (typeof file.profile !== "object" || file.profile === null || Array.isArray(file.profile)) return { ok: false, error: t("That save has no progress in it.") };
   // parseProfile keeps what is valid and drops what is not, so a damaged profile still gives a usable one
   const profile = parseProfile(JSON.stringify(file.profile));
   let run: Run | null = null;
   if (file.run !== null && file.run !== undefined) {
     run = parseRun(JSON.stringify(file.run));
-    if (run === null || run.phase !== "shop") return { ok: false, error: "The run inside that save is damaged." };
+    if (run === null || run.phase !== "shop") return { ok: false, error: t("The run inside that save is damaged.") };
   }
   return { ok: true, profile, run, exported: typeof file.exported === "string" ? file.exported.slice(0, 40) : "" };
 }

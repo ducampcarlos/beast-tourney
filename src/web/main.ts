@@ -12,8 +12,12 @@ import { Shop } from "./shop.js";
 import { Skills } from "./skills.js";
 import { Trophies } from "./trophies.js";
 import { H, W } from "./ui.js";
+import { detectLang, setLang } from "../i18n/index.js";
 
 const session = new Session();
+const lang = session.profile.lang ?? detectLang(navigator.languages ?? [navigator.language]);
+setLang(lang);
+document.documentElement.lang = lang;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
