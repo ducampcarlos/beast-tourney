@@ -218,7 +218,7 @@ describe("what each boon does", () => {
 
 describe("boon content", () => {
   it("is well formed", () => {
-    expect(BOONS).toHaveLength(12);
+    expect(BOONS).toHaveLength(15);
     expect(new Set(BOONS.map((b) => b.id)).size).toBe(BOONS.length);
     for (const b of BOONS) {
       expect(b.icon).toBeGreaterThanOrEqual(0);
@@ -279,5 +279,78 @@ describe("the bots", () => {
       if (run.boons.length > 0) withBoons++;
     }
     expect(withBoons).toBeGreaterThan(20);
+  });
+});
+
+describe("later boons", () => {
+  it("Champion's Crest gives the front creature +3/+3 and only that one", () => {
+    resetUids();
+    const team = [unit("bones", 2, 5), unit("bones", 2, 5)];
+    const r = simulateBattle(team, [unit("bones", 1, 50)], 1, { boons: ["crest"] });
+    const first = r.steps[1]!.teams[0];
+    expect(first.map((u) => [u.atk, u.hp])).toEqual([[5, 8], [2, 5]]);
+    expect(events(r).filter((e) => e.t === "boon")).toHaveLength(1);
+  });
+
+  const afterFight = (run: Run, boons: string[]): Run => {
+    const r = fight({ ...structuredClone(run), boons, team: [unit("wolf", 50, 99), null, null, null, null], nextUid: 99 });
+    if (!r.ok) throw new Error(r.error);
+    return r.run;
+  };
+
+  it("Spoils of War pays 2 gold after a won battle, and nothing after a lost one", () => {
+    const base = newRun(8, "knight");
+    const won = afterFight(base, ["spoils"]);
+    expect(won.history.at(-1)!.outcome).toBe("win");
+    expect(won.gold).toBe(10 + 2);
+    const lostRun = fight({ ...structuredClone(base), boons: ["spoils"], team: [unit("bones", 1, 1), null, null, null, null], nextUid: 99 });
+    expect(lostRun.ok && lostRun.run.history.at(-1)!.outcome).toBe("lose");
+    expect(lostRun.ok && lostRun.run.gold).toBe(10);
+    expect(afterFight(base, []).gold).toBe(10);
+  });
+
+  it("Compound Interest returns 1 gold for every 3 unspent, up to 3", () => {
+    const base = newRun(8, "knight");
+    const kept = (gold: number) => afterFight({ ...base, gold }, ["interest"]).gold;
+    expect(kept(0)).toBe(10);
+    expect(kept(2)).toBe(10);
+    expect(kept(3)).toBe(11);
+    expect(kept(8)).toBe(12);
+    expect(kept(9)).toBe(13);
+    expect(kept(40)).toBe(13);
+    expect(afterFight({ ...base, gold: 9 }, []).gold).toBe(10);
+  });
+});
+
+describe("later creatures and relics", () => {
+  it("Busy Bee stings the weakest enemy, scaling with level", () => {
+    resetUids();
+    const r = simulateBattle([unit("bee", 2, 3)], [unit("bones", 6, 9), unit("bones", 2, 3), unit("bones", 6, 6)], 1); // the weakest is the one with the least attack
+    expect(events(r).some((e) => e.t === "damage" && e.amount === 2)).toBe(true);
+    const readied = r.steps.find((s) => s.note === "Busy Bee readies.")!;
+    expect(readied.teams[1].map((u) => u.hp)).toEqual([9, 1, 6]);
+  });
+
+  it("Dune Scorpion turns venomous once it has been hurt", () => {
+    resetUids();
+    const r = simulateBattle([unit("scorpion", 3, 30)], [unit("bones", 1, 40)], 1);
+    expect(r.steps.some((s) => s.teams[0].some((u) => u.sp === "scorpion" && u.statuses.includes("venom")))).toBe(true);
+  });
+
+  it("Healing Draught shelters the team when its bearer falls", () => {
+    resetUids();
+    const r = simulateBattle([unit("bones", 1, 1, { relic: "healing-draught" }), unit("bones", 1, 5)], [unit("bones", 9, 40)], 1);
+    const after = r.steps.find((s) => s.teams[0].length === 1)!;
+    expect(after.teams[0][0]!.hp).toBeGreaterThan(5 - 9 + 3 - 1);
+    expect(events(r).some((e) => e.t === "buff")).toBe(true);
+  });
+
+  it("Spiked Helm adds health, and Coin Purse pays at the start of the turn", () => {
+    expect(relic("spiked-helm").hp).toBe(2);
+    let run = setup(newRun(4, "knight"), { team: [unit("bones", 1, 1, { relic: "coin-purse" }), null, null, null, null], nextUid: 99 });
+    const r = fight({ ...run, team: [unit("wolf", 50, 99, { relic: "coin-purse" }), null, null, null, null] });
+    expect(r.ok && r.run.gold).toBe(11);
+    run = setup(newRun(4, "knight"), {});
+    expect(run.gold).toBe(10);
   });
 });

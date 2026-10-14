@@ -141,7 +141,7 @@ function playRandom(start: Run, rng: Rng): Run {
 }
 
 /** What the bots take first. A fixed order is crude, but it is what a player who has not thought much would roughly do. */
-const BOON_ORDER = ["tonic", "purse", "mentor", "bulwark", "ember", "lucky", "scholar", "market", "bond-sage", "second-wind", "thrift", "haggler"];
+const BOON_ORDER = ["tonic", "purse", "mentor", "bulwark", "ember", "lucky", "scholar", "market", "bond-sage", "second-wind", "crest", "spoils", "interest", "thrift", "haggler"];
 
 function pickBoon(run: Run, skill: Skill): Run {
   const options = run.pendingBoons ?? [];

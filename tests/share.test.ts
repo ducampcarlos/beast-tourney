@@ -25,6 +25,11 @@ describe("share text", () => {
     expect(lines[2]).toBe("🟩🟨🟥🟦");
   });
 
+  it("names the oaths that were taken", () => {
+    const run = setup(newRun(42, "knight", ["glass", "bare"]), { history, phase: "lost", round: 5 });
+    expect(shareText(run).split("\n")[0]).toBe("Beast Tourney - knight, seed 42, oaths: Glass Cannons + Bare Hands");
+  });
+
   it("calls a winner champion and an endless run by its depth", () => {
     const won = setup(newRun(1, "squire"), { history, phase: "won" });
     expect(shareText(won)).toContain("Champion - 2 rounds won");

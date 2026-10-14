@@ -47,18 +47,23 @@ export class Trophies extends Phaser.Scene {
 
   private drawTrophies(session: Session): void {
     const owned = session.profile.trophies;
-    this.keep(text(this, 560, 27, `${owned.length} of ${TROPHIES.length}`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
+    this.keep(text(this, 600, 27, `${owned.length} of ${TROPHIES.length}`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
+    // two columns; the rows squeeze together as trophies are added, so the list always fits the panel
+    const rows = Math.ceil(TROPHIES.length / 2);
+    const pitch = Math.min(49, Math.floor(448 / rows));
+    const height = pitch - 5;
+    const roomy = pitch >= 46;
     TROPHIES.forEach((t, i) => {
       const col = i % 2;
       const row = Math.floor(i / 2);
       const x = 32 + col * 468;
-      const y = 78 + row * 49;
+      const y = 76 + row * pitch;
       const got = owned.includes(t.id);
-      this.keep(this.rect(x + 216, y + 20, 440, 44, got ? 0x4a3a22 : 0x2f2418, got ? 0xf2c14e : 0x4a3a2a));
-      const star = this.image(x + 26, y + 20, "star", 3);
+      this.keep(this.rect(x + 216, y + height / 2, 440, height, got ? 0x4a3a22 : 0x2f2418, got ? 0xf2c14e : 0x4a3a2a));
+      const star = this.image(x + 26, y + height / 2, "star", roomy ? 3 : 2.5);
       if (!got) star.setTintFill(0x1a1410).setAlpha(0.8);
-      this.keep(text(this, x + 56, y + 4, got ? t.name : "???", 21, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
-      this.keep(text(this, x + 56, y + 25, t.text, 14, got ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2 }));
+      this.keep(text(this, x + 56, y + (roomy ? 4 : 2), got ? t.name : "???", roomy ? 21 : 19, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
+      this.keep(text(this, x + 56, y + (roomy ? 25 : 21), t.text, roomy ? 14 : 13, got ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2 }));
     });
   }
 

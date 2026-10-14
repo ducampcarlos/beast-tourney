@@ -31,7 +31,10 @@ export const TUNING = { scale: 1 };
 
 /** Past the twelfth round the curve keeps climbing, 8% a round. */
 export const rawPower = (round: number): number => (round <= POWER.length ? POWER[round - 1]! : POWER[POWER.length - 1]! * 1.08 ** (round - POWER.length));
-export const targetPower = (round: number, difficulty: Difficulty): number => rawPower(round) * DIFFICULTY_MULT[difficulty] * TUNING.scale;
+/** How the oaths taken change the opponents' strength. */
+export const OATH_POWER: Record<string, number> = { bare: 0.92, hunted: 1.1 };
+export const oathPower = (oaths: readonly string[]): number => oaths.reduce((m, id) => m * (OATH_POWER[id] ?? 1), 1);
+export const targetPower = (round: number, difficulty: Difficulty, oaths: readonly string[] = []): number => rawPower(round) * DIFFICULTY_MULT[difficulty] * TUNING.scale * oathPower(oaths);
 const SIZES = [2, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5];
 const sizeFor = (round: number): number => SIZES[Math.min(round, SIZES.length) - 1]!;
 
@@ -54,7 +57,7 @@ export function bossName(round: number): string | undefined {
   return round > MAX_ROUNDS ? `${base}, Reborn` : base;
 }
 
-export function enemyTeam(seed: number, round: number, attempt: number, difficulty: Difficulty): Unit[] {
+export function enemyTeam(seed: number, round: number, attempt: number, difficulty: Difficulty, oaths: readonly string[] = []): Unit[] {
   const rng = new Rng(hashSeed(seed, round, attempt, 0xe7e));
   const boss = isBossRound(round) ? BOSS_CASTS[bossKey(round)] : undefined;
   const slots = boss ? boss.cast : generate(rng, round);
@@ -66,7 +69,7 @@ export function enemyTeam(seed: number, round: number, attempt: number, difficul
     return { uid: i + 1, sp: sp.id, atk: sp.atk + grown + (rel?.atk ?? 0), hp: sp.hp + grown + (rel?.hp ?? 0), level, exp: grown, relic: slot.relic } satisfies Unit;
   });
   const total = raw.reduce((sum, u) => sum + u.atk + u.hp, 0);
-  const factor = targetPower(round, difficulty) / total;
+  const factor = targetPower(round, difficulty, oaths) / total;
   // Relic stats are applied again in battle, so take them out before scaling and leave them to the battle.
   return raw.map((u) => {
     const rel = u.relic ? relic(u.relic) : undefined;

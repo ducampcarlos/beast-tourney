@@ -14,8 +14,10 @@ import { type Skill, playRun } from "./bots.js";
 const n = Number(process.argv[2] ?? 200);
 const skill = (process.argv[3] ?? "greedy") as Skill;
 if (process.argv[4]) TUNING.scale = Number(process.argv[4]);
+/** OATHS=pauper,glass npm run balance: play every run under these oaths. */
+const oaths = (process.env.OATHS ?? "").split(",").filter(Boolean);
 
-console.log(`Balance report: ${n} runs per difficulty, ${skill} bot, enemy power x${TUNING.scale}\n`);
+console.log(`Balance report: ${n} runs per difficulty, ${skill} bot, enemy power x${TUNING.scale}${oaths.length ? `, oaths: ${oaths.join(", ")}` : ""}\n`);
 for (const difficulty of DIFFICULTIES) {
   let wins = 0;
   const reached = new Map<number, number>();
@@ -23,7 +25,7 @@ for (const difficulty of DIFFICULTIES) {
   const byRound = new Map<number, { w: number; l: number; d: number }>();
   const power = new Map<number, { me: number; foe: number; n: number }>();
   for (let seed = 1; seed <= n; seed++) {
-    const { log, run } = playRun(newRun(seed * 7919, difficulty), skill);
+    const { log, run } = playRun(newRun(seed * 7919, difficulty, oaths), skill);
     if (log.won) wins++;
     reached.set(run.round, (reached.get(run.round) ?? 0) + 1);
     for (const f of log.fights) {

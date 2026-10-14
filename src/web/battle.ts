@@ -446,7 +446,7 @@ export class Battle extends Phaser.Scene {
     this.session.update(after);
     if (after.phase !== "shop") {
       this.session.finish();
-      award(this.registry, newTrophies(this.session.profile.trophies, { end: { won: after.phase === "won", difficulty: after.difficulty, lives: after.lives, lost: after.history.some((h) => h.outcome === "lose") } }));
+      award(this.registry, newTrophies(this.session.profile.trophies, { end: { won: after.phase === "won", difficulty: after.difficulty, lives: after.lives, lost: after.history.some((h) => h.outcome === "lose"), oaths: after.oaths.length } }));
       award(this.registry, newTrophies(this.session.profile.trophies, { seen: this.session.profile.seen.length }));
       go(this, "End", { run: after });
     } else if (after.pendingBoons) {

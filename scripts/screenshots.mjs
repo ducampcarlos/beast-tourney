@@ -56,6 +56,12 @@ const go = (page, key, data) => page.evaluate(({ key, data }) => window.__tourne
   const { page, context } = await open();
   await page.waitForTimeout(2500);
   await shot(page, "menu");
+  // the oaths panel, with three vows sworn
+  await page.mouse.click(608, 322);
+  await page.waitForTimeout(300);
+  for (const y of [148, 208, 268]) await page.mouse.click(770, y);
+  await page.waitForTimeout(300);
+  await shot(page, "oaths");
   await context.close();
 }
 

@@ -8,9 +8,12 @@ import type { Session } from "./session.js";
 import { COLOR, H, W, backdrop, button, fadeIn, go, lighten, panel, text } from "./ui.js";
 import { flushTrophies } from "./toasts.js";
 
-const CELL = 62;
-const GRID_X = 168;
 const GRID_Y = 96;
+/** The grid shrinks to fit the faction with the most creatures in the room beside the labels. */
+const COLUMNS = Math.max(...FACTIONS.map((f) => SPECIES_LIST.filter((s) => s.faction === f).length));
+const CELL = Math.min(62, Math.floor(496 / COLUMNS));
+const GRID_X = 132 + CELL / 2;
+const SPRITE = Math.round((CELL / 62) * 30) / 10;
 
 export class Bestiary extends Phaser.Scene {
   private detail: Phaser.GameObjects.GameObject[] = [];
@@ -43,7 +46,7 @@ export class Bestiary extends Phaser.Scene {
         const x = GRID_X + col * CELL;
         const known = this.session.profile.seen.includes(s.id);
         this.add.rectangle(x, y, CELL - 6, CELL - 6, 0x3b2a1a, 0.8).setStrokeStyle(3, known ? def.color : 0x4a3a2a);
-        const sprite = this.add.sprite(x, y, "creatures", s.frames[0]).setScale(3);
+        const sprite = this.add.sprite(x, y, "creatures", s.frames[0]).setScale(SPRITE);
         if (!known) sprite.setTintFill(0x1a1410).setAlpha(0.9);
         const hit = this.add.rectangle(x, y, CELL - 6, CELL - 6, 0xffffff, 0).setInteractive({ useHandCursor: true });
         hit.on("pointerover", () => this.show(s.id, known));

@@ -410,6 +410,35 @@ await test("a creature can be grabbed anywhere on it, corners and stat badges in
   await page.context().close();
 });
 
+await test("oaths are sworn from the menu and shape the run", async () => {
+  const page = await newPage("?debug&nohelp&seed=5");
+  await click(page, { x: 608, y: 322 }); // Oaths
+  await click(page, { x: 770, y: 148 }); // Pauper's Oath
+  await click(page, { x: 770, y: 208 }); // Bare Hands
+  await page.keyboard.press("Escape"); // closes the panel
+  await page.waitForTimeout(150);
+  assert.deepEqual(await page.evaluate(() => window.__tourney.game.registry.get("oaths")), ["pauper", "bare"]);
+  await click(page, { x: 418, y: 322 }); // New Run
+  await scene(page, "Shop");
+  let r = await run(page);
+  assert.deepEqual([r.oaths, r.gold], [["pauper", "bare"], 9]);
+  // they show in the top bar and say what they do when hovered
+  await page.mouse.move(716, 27);
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => window.__tourney.game.scene.getScene("Shop").hover?.kind), "oath");
+  // a new run from the menu remembers the vows; the Daily Run takes none
+  await page.evaluate(() => window.__tourney.session.abandon());
+  await page.evaluate(() => window.__tourney.game.scene.getScenes(true)[0].scene.start("Menu"));
+  await scene(page, "Menu");
+  await page.waitForTimeout(400);
+  assert.deepEqual(await page.evaluate(() => window.__tourney.game.registry.get("oaths")), ["pauper", "bare"]);
+  await click(page, { x: 480, y: 376 }); // Daily Run
+  await scene(page, "Shop");
+  r = await run(page);
+  assert.deepEqual([r.oaths, r.gold], [[], 10]);
+  await page.context().close();
+});
+
 await test("continues a saved run after a reload", async () => {
   const page = await newPage("?debug&nohelp&seed=21");
   await click(page, { x: 480, y: 322 });

@@ -6,6 +6,7 @@ import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import type { Session } from "./session.js";
 import { HELP_LINES } from "./help.js";
+import { openOaths } from "./oaths.js";
 import { openSettings } from "./settings.js";
 import { COLOR, H, W, backdrop, button, fadeIn, go, overlay, panel, text, type Button } from "./ui.js";
 
@@ -53,13 +54,16 @@ export class Menu extends Phaser.Scene {
 
     const params = new URLSearchParams(window.location.search);
     const seedParam = params.get("seed");
-    button(this, W / 2, 322, "New Run", () => this.begin(session, seedParam ? Number(seedParam) >>> 0 : undefined), { w: 280, h: 54, color: "green", size: 30 });
+    button(this, W / 2 - 62, 322, "New Run", () => this.begin(session, seedParam ? Number(seedParam) >>> 0 : undefined), { w: 220, h: 54, color: "green", size: 30 });
+    this.oathsButton = button(this, W / 2 + 128, 322, "", () => openOaths(this, this.oaths, () => this.showOaths()), { w: 120, h: 54, color: "red", size: 20 }) as Button;
+    this.oaths = [...((this.registry.get("oaths") as string[] | undefined) ?? [])];
+    this.showOaths();
 
     if (session.hasSavedRun()) {
       const r = session.run!;
       button(this, W / 2, 376, `Continue (round ${r.round}, ${r.lives} lives)`, () => go(this, "Shop"), { w: 400, h: 44, color: "yellow", size: 20 });
     } else {
-      button(this, W / 2, 376, "Daily Run", () => this.begin(session, dailySeed(), "knight"), { w: 280, h: 44, color: "blue", size: 22 });
+      button(this, W / 2, 376, "Daily Run", () => this.begin(session, dailySeed(), "knight", []), { w: 280, h: 44, color: "blue", size: 22 });
     }
     button(this, W / 2 - 100, 424, "Bestiary", () => go(this, "Bestiary"), { w: 190, h: 40, color: "blue", size: 20 });
     button(this, W / 2 + 100, 424, "Trophies", () => go(this, "Trophies"), { w: 190, h: 40, color: "blue", size: 20 });
@@ -76,6 +80,15 @@ export class Menu extends Phaser.Scene {
   }
 
   private recordText!: Phaser.GameObjects.Text;
+  private oathsButton!: Button;
+  private oaths: string[] = [];
+
+  /** Remember the vows for the next run and say how many are sworn. */
+  private showOaths(): void {
+    this.registry.set("oaths", [...this.oaths]);
+    this.oathsButton.setLabel(this.oaths.length > 0 ? `Oaths (${this.oaths.length})` : "Oaths");
+    this.oathsButton.setAlpha(this.oaths.length > 0 ? 1 : 0.75);
+  }
 
   private pick(d: Difficulty, sound = true): void {
     this.difficulty = d;
@@ -88,8 +101,8 @@ export class Menu extends Phaser.Scene {
     if (sound) (this.registry.get("audio") as Audio).sfx("select", 0.4);
   }
 
-  private begin(session: Session, seed?: number, difficulty: Difficulty = this.difficulty): void {
-    session.start(difficulty, seed);
+  private begin(session: Session, seed?: number, difficulty: Difficulty = this.difficulty, oaths: readonly string[] = this.oaths): void {
+    session.start(difficulty, seed, oaths); // the Daily Run is the same for everyone, so it takes none
     go(this, "Shop");
   }
 

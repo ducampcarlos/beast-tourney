@@ -103,7 +103,7 @@ describe("playing Endless mode", () => {
     const r = fightOk(run);
     expect(r.run.pendingBoons).toHaveLength(3);
     const all = BOONS.map((b) => b.id);
-    const everything = fightOk(setup({ ...run, boons: all.slice(0, 11) }, { team: giants(), nextUid: 30 }));
+    const everything = fightOk(setup({ ...run, boons: all.slice(0, all.length - 1) }, { team: giants(), nextUid: 30 }));
     expect(everything.run.pendingBoons).toHaveLength(1);
     const none = fightOk(setup({ ...run, boons: all }, { team: giants(), nextUid: 30 }));
     expect(none.run.pendingBoons).toBeNull();

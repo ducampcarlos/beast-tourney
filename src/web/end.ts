@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import { species } from "../engine/data.js";
+import { oath, species } from "../engine/data.js";
 import { MAX_ROUNDS } from "../engine/enemy.js";
 import { type Run, continueEndless } from "../engine/run.js";
 import { shareText } from "../engine/share.js";
@@ -51,9 +51,10 @@ export class End extends Phaser.Scene {
     const lines = [
       `${run.difficulty[0]!.toUpperCase()}${run.difficulty.slice(1)}   ·   Seed ${run.seed}`,
       `Rounds won: ${wins}   ·   Lives left: ${run.lives}${run.endless ? `   ·   Deepest: ${Math.max(session.profile.depth[run.difficulty], run.round)}` : ""}`,
+      run.oaths.length > 0 ? `Oaths: ${run.oaths.map((id) => oath(id).name).join(", ")}` : "",
       team.length > 0 ? `Strongest: ${strongest(team)}` : "",
     ].filter(Boolean);
-    text(this, W / 2, 350, lines.join("\n"), 22, COLOR.cream, { align: "center", lineSpacing: 8 }).setOrigin(0.5, 0);
+    text(this, W / 2, lines.length > 3 ? 330 : 350, lines.join("\n"), lines.length > 3 ? 19 : 22, COLOR.cream, { align: "center", lineSpacing: lines.length > 3 ? 4 : 8 }).setOrigin(0.5, 0);
 
     const offerEndless = won && !run.endless;
     // The tournament is won; the Depths are for those who want more, so the row has four buttons.

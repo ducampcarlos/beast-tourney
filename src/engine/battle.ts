@@ -80,10 +80,12 @@ const scale = (n: number | undefined, level: number): number => (n ?? 0) * level
 export interface BattleOptions {
   /** Boons the player holds; the enemy never has any. */
   boons?: readonly string[];
+  /** Oaths the player took; some of them change how the player's creatures fight. */
+  oaths?: readonly string[];
 }
 
 export function simulateBattle(player: readonly Unit[], enemy: readonly Unit[], seed: number, options: BattleOptions = {}): BattleResult {
-  return new Battle(player, enemy, seed, options.boons ?? []).run();
+  return new Battle(player, enemy, seed, options.boons ?? [], options.oaths ?? []).run();
 }
 
 class Battle {
@@ -98,7 +100,7 @@ class Battle {
   private nextUid = SUMMON_UID_BASE;
   private clashes = 0;
 
-  constructor(player: readonly Unit[], enemy: readonly Unit[], seed: number, private readonly boons: readonly string[]) {
+  constructor(player: readonly Unit[], enemy: readonly Unit[], seed: number, private readonly boons: readonly string[], private readonly oaths: readonly string[]) {
     this.rng = new Rng(seed);
     this.teams = [player.slice(0, SLOTS).map((u) => this.make(u, 0, 0)), enemy.slice(0, SLOTS).map((u) => this.make(u, 1, ENEMY_UID_BASE))];
   }
@@ -285,9 +287,21 @@ class Battle {
   private applyBoons(): void {
     const team = this.teams[0];
     if (team.length === 0) return;
+    if (this.oaths.includes("glass")) {
+      for (const u of team) {
+        u.atk += 2;
+        u.hp = Math.max(1, u.hp - 2);
+        u.startAtk = u.atk;
+        u.startHp = u.hp;
+      }
+    }
     if (this.boons.includes("tonic")) {
       this.emit({ t: "boon", id: "tonic" });
       this.apply(team[0]!, { kind: "buff", to: "all", atk: 1, hp: 1 }, undefined, 1);
+    }
+    if (this.boons.includes("crest")) {
+      this.emit({ t: "boon", id: "crest" });
+      this.apply(team[0]!, { kind: "buff", to: "self", atk: 3, hp: 3 }, undefined, 1);
     }
     if (this.boons.includes("bulwark")) {
       this.emit({ t: "boon", id: "bulwark" });

@@ -5,7 +5,7 @@
  */
 
 import { type BattleResult, type Outcome, simulateBattle } from "./battle.js";
-import { BOONS, FACTION_DEFS, RELICS, SPECIES_LIST, bondNeed, relic as relicDef, species as speciesDef } from "./data.js";
+import { BOONS, FACTION_DEFS, RELICS, SPECIES_LIST, bondNeed, hasOath, relic as relicDef, species as speciesDef } from "./data.js";
 import { MAX_ROUNDS, enemyTeam, isBossRound, tierCap } from "./enemy.js";
 import { Rng, hashSeed } from "./rng.js";
 import { selectAllies } from "./targets.js";
@@ -56,6 +56,8 @@ export interface Run {
   pendingBoons: string[] | null;
   /** Rolls that cost nothing this turn. */
   freeRolls: number;
+  /** Optional vows taken before the run: each makes it harder. */
+  oaths: string[];
 }
 
 export type ShopEvent =
@@ -88,11 +90,11 @@ export function newUnit(run: Run, spId: string): Unit {
   return { uid: run.nextUid++, sp: sp.id, atk: sp.atk, hp: sp.hp, level: 1, exp: 0 };
 }
 
-export function newRun(seed: number, difficulty: Difficulty): Run {
+export function newRun(seed: number, difficulty: Difficulty, oaths: readonly string[] = []): Run {
   const run: Run = {
-    v: 1, seed: seed >>> 0, difficulty, round: 1, attempt: 0, lives: LIVES[difficulty], wins: 0, gold: START_GOLD,
+    v: 1, seed: seed >>> 0, difficulty, round: 1, attempt: 0, lives: Math.max(1, LIVES[difficulty] - (oaths.includes("fragile") ? 1 : 0)), wins: 0, gold: START_GOLD,
     rng: hashSeed(seed, 0x5eed), nextUid: 1, team: Array<Unit | null>(SLOTS).fill(null), offers: [], relics: [], phase: "shop", history: [],
-    boons: [], pendingBoons: null, freeRolls: 0, endless: false,
+    boons: [], pendingBoons: null, freeRolls: 0, endless: false, oaths: [...new Set(oaths)].filter(hasOath),
   };
   beginTurn(run);
   return run;
@@ -123,7 +125,7 @@ function stock(run: Run, rng: Rng): void {
   for (let i = 0; i < n; i++) offers.push(run.offers[i]?.frozen ? run.offers[i]! : { sp: weightedSpecies(rng, cap), frozen: false });
   run.offers = offers;
   const pool = RELICS.filter((r) => r.cost <= (run.round >= 6 ? 5 : 4));
-  const m = relicOfferCount(run.round);
+  const m = run.oaths.includes("bare") ? 0 : relicOfferCount(run.round);
   const relics: (RelicOffer | null)[] = [];
   for (let i = 0; i < m; i++) relics.push(run.relics[i]?.frozen ? run.relics[i]! : { id: rng.pick(pool).id, frozen: false });
   run.relics = relics;
@@ -151,7 +153,12 @@ function mentorBuff(run: Run, events: ShopEvent[]): void {
 }
 
 function beginTurn(run: Run): ShopEvent[] {
-  run.gold = START_GOLD + (holds(run, "purse") ? 2 : 0);
+  const unspent = run.gold;
+  const won = run.history.at(-1)?.outcome === "win";
+  run.gold =
+    START_GOLD + (holds(run, "purse") ? 2 : 0) - (run.oaths.includes("pauper") ? 1 : 0) +
+    (holds(run, "spoils") && won ? 2 : 0) +
+    (holds(run, "interest") ? Math.min(3, Math.floor(unspent / 3)) : 0);
   run.freeRolls = holds(run, "lucky") ? 1 : 0;
   const events = turnEffects(run);
   stock(run, new Rng(run.rng));
@@ -322,8 +329,8 @@ export function fight(run: Run): FightResult {
   const mine = teamUnits(run);
   if (mine.length === 0) return { ok: false, error: "Field at least one creature." };
   const next = clone(run);
-  const enemy = enemyTeam(next.seed, next.round, next.attempt, next.difficulty);
-  const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons });
+  const enemy = enemyTeam(next.seed, next.round, next.attempt, next.difficulty, next.oaths);
+  const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons, oaths: next.oaths });
   const boss = isBossRound(next.round);
   next.history.push({ round: next.round, outcome: battle.outcome, boss });
 

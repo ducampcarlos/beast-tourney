@@ -22,6 +22,12 @@ describe("trophies", () => {
     expect(trophy("nope")).toBeUndefined();
   });
 
+  it("awards the hoard only for a lot of gold", () => {
+    expect(earned({ gold: 17 })).not.toContain("rich");
+    expect(earned({ gold: 18 })).toContain("rich");
+    expect(earned({})).not.toContain("rich");
+  });
+
   it("awards nothing for nothing", () => {
     expect(earned({})).toEqual([]);
     expect(earned({ team: [null, null, null, null, null], battle: { outcome: "draw", round: 2, bonds: [] } })).toEqual([]);

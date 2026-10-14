@@ -104,6 +104,9 @@ const WILDKIN = build("wildkin", [
   ["stag", "Great Stag", 3, 5, 6, [161, 162, 162], when("faint", buff("all", 2, 0)), "Its last charge inspires the herd."],
   ["eagle", "Sky Eagle", 4, 5, 5, [135, 134, 104], when("battleStart", { kind: "hit", to: "back", dmg: 6 }), "Dives on the weakest from above."],
   ["mammoth", "Tundra Mammoth", 5, 8, 12, [158, 158, 171], when("battleStart", { kind: "buff", to: "faction", atk: 2, hp: 2 }, { kind: "status", to: "self", status: "barrier" }), "A living wall."],
+  ["bee", "Busy Bee", 1, 2, 1, 140, when("battleStart", { kind: "hit", to: "weakest", dmg: 2 }), "Finds the weakest flower."],
+  ["owl", "Watchful Owl", 2, 2, 4, 117, when("battleStart", buff("random", 0, 2)), "Guards the branch."],
+  ["polar", "Ice Bear", 4, 5, 8, 164, when("battleStart", { kind: "status", to: "self", status: "barrier" }, buff("all", 0, 1)), "Wears the winter."],
 ]);
 
 const UNDEAD = build("undead", [
@@ -126,6 +129,7 @@ const ELEMENTAL = build("elemental", [
   ["gust", "Gale Spirit", 3, 4, 4, [58, 48, 48], when("battleStart", { kind: "hit", to: "random", dmg: 2, count: 2 }), "Cuts from two directions."],
   ["frost", "Frost Warden", 4, 5, 7, [59, 49, 49], when("battleStart", { kind: "hit", to: "all", dmg: 2 }), "The air turns on your enemies."],
   ["core", "Arcane Core", 5, 6, 7, 89, when("battleStart", { kind: "status", to: "all", status: "barrier" }), "A heart of raw power; it shelters everyone."],
+  ["jade", "Jade Golem", 2, 3, 5, [82, 81, 80], when("allyFaint", { kind: "status", to: "self", status: "barrier" }), "Hardens whenever a friend falls."],
 ]);
 
 const FAE = build("fae", [
@@ -137,6 +141,8 @@ const FAE = build("fae", [
   ["maneater", "Maneater Bloom", 3, 3, 5, 8, when("turnStart", buff("random", 2, 1)), "Feeds the whole garden."],
   ["dryad", "Forest Dryad", 4, 4, 5, 25, when("battleStart", buff("all", 1, 1)), "The woods lend a hand."],
   ["unicorn", "Moon Unicorn", 5, 5, 6, [51, 51, 52], when("battleStart", { kind: "status", to: "random", status: "barrier" }, buff("all", 1, 1)), "Shelters the worthy."],
+  ["frog", "Pond Frog", 1, 1, 3, 147, when("faint", buff("random", 3, 1)), "Its last croak is a cheer."],
+  ["tortoise", "Moss Tortoise", 4, 3, 9, 149, when("turnStart", buff("self", 1, 2)), "Takes its time, and gets there."],
 ]);
 
 const DRAGONKIN = build("dragonkin", [
@@ -147,6 +153,8 @@ const DRAGONKIN = build("dragonkin", [
   ["wyvern", "Frost Wyvern", 4, 6, 7, [31, 31, 30], when("battleStart", { kind: "hit", to: "random", dmg: 3, count: 2 }), "Two frozen gusts."],
   ["gorgon", "Gorgon Queen", 4, 4, 7, 7, when("battleStart", { kind: "hit", to: "strongest", dmg: 6 }), "One look at the strongest."],
   ["wyrm", "Shadow Wyrm", 5, 8, 9, 32, when("battleStart", { kind: "hit", to: "all", dmg: 4 }), "Darkness with teeth."],
+  ["scorpion", "Dune Scorpion", 2, 3, 3, 145, when("hurt", { kind: "status", to: "self", status: "venom" }), "Strike it once, and it strikes to kill."],
+  ["basilisk", "Hissing Basilisk", 3, 4, 5, 144, when("kill", { kind: "status", to: "self", status: "barrier" }), "Every kill is a lesson."],
 ]);
 
 const HORDE = build("horde", [
@@ -169,6 +177,8 @@ const ORDER = build("order", [
   ["gargoyle", "Stone Gargoyle", 3, 3, 6, 69, when("faint", buff("all", 1, 2)), "Crumbles, and shelters the rest."],
   ["genie", "Wish Genie", 4, 4, 6, 109, when("sell", { kind: "gold", amount: 3 }), "Grants exactly one wish: gold."],
   ["pegasus", "Winged Pegasus", 5, 7, 9, 52, when("battleStart", buff("all", 2, 2)), "A banner in the sky."],
+  ["beetle", "Plated Beetle", 2, 2, 6, 143, when("hurt", buff("behind", 0, 1)), "Takes the blow for the line."],
+  ["griffin", "Temple Griffin", 4, 5, 7, 105, when("battleStart", buff("all", 1, 0), { kind: "hit", to: "front", dmg: 3 }), "Dives, and the guard follows."],
 ]);
 
 export const SPECIES_LIST: Species[] = [...WILDKIN, ...UNDEAD, ...ELEMENTAL, ...FAE, ...DRAGONKIN, ...HORDE, ...ORDER];
@@ -215,6 +225,9 @@ export const RELICS: RelicDef[] = [
   { id: "phoenix-tear", name: "Phoenix Tear", cost: 5, icon: 115, ability: when("faint", { kind: "revive", pct: 0.5 }), text: "When it faints, it returns once with half its stats." },
   { id: "arcane-staff", name: "Arcane Staff", cost: 5, icon: 129, ability: when("battleStart", buff("random", 2, 2)), text: "At battle start, a random ally gains +2/+2." },
   { id: "merchant-ring", name: "Merchant's Ring", cost: 3, icon: 89, ability: when("sell", { kind: "gold", amount: 3 }), text: "When sold, gain 3 gold." },
+  { id: "coin-purse", name: "Coin Purse", cost: 3, icon: 66, ability: when("turnStart", { kind: "gold", amount: 1 }), text: "At the start of each turn, gain 1 gold." },
+  { id: "spiked-helm", name: "Spiked Helm", cost: 3, icon: 97, hp: 2, ability: when("hurt", { kind: "hit", to: "front", dmg: 2 }), text: "+2 health. When hurt, 2 damage to the front enemy." },
+  { id: "healing-draught", name: "Healing Draught", cost: 4, icon: 116, ability: when("faint", buff("all", 0, 3)), text: "When it faints, allies gain +3 health." },
   { id: "great-hammer", name: "Great Hammer", cost: 4, icon: 117, atk: 2, ability: when("kill", buff("self", 2, 0)), text: "+2 attack, and +2 more for every kill." },
 ];
 
@@ -249,8 +262,36 @@ export const BOONS: BoonDef[] = [
   { id: "bulwark", name: "Vanguard's Oath", icon: 96, text: "Your front creature starts every battle with a barrier." },
   { id: "tonic", name: "Battle Tonic", icon: 126, text: "Your creatures start every battle with +1/+1." },
   { id: "ember", name: "Phoenix Ember", icon: 115, text: "The first creature to fall in each battle returns with half its stats." },
+  { id: "crest", name: "Champion's Crest", icon: 98, text: "Your front creature starts every battle with +3/+3." },
+  { id: "spoils", name: "Spoils of War", icon: 92, text: "After a won battle, start the next turn with 2 more gold." },
+  { id: "interest", name: "Compound Interest", icon: 90, text: "Every 3 gold you leave unspent returns 1 at the start of the next turn (at most 3)." },
   { id: "second-wind", name: "Second Wind", icon: 114, text: "Gain a life right away." },
 ];
+
+/**
+ * Oaths: optional vows taken before a run, each one making it harder in a different way. They are
+ * what a veteran adds to a tournament they have already won.
+ */
+export interface OathDef {
+  id: string;
+  name: string;
+  icon: number;
+  text: string;
+}
+export const OATHS: OathDef[] = [
+  { id: "pauper", name: "Pauper's Oath", icon: 66, text: "One gold less at the start of every turn." },
+  { id: "bare", name: "Bare Hands", icon: 101, text: "No relics are for sale. The opponents are 8% weaker." },
+  { id: "glass", name: "Glass Cannons", icon: 113, text: "Your creatures fight with +2 attack and -2 health (never below 1)." },
+  { id: "hunted", name: "The Hunted", icon: 110, text: "The opponents are 10% stronger." },
+  { id: "fragile", name: "One Life Fewer", icon: 115, text: "You start with one life less." },
+];
+const OATH_MAP = new Map(OATHS.map((o) => [o.id, o]));
+export function oath(id: string): OathDef {
+  const found = OATH_MAP.get(id);
+  if (!found) throw new Error(`Unknown oath "${id}"`);
+  return found;
+}
+export const hasOath = (id: string): boolean => OATH_MAP.has(id);
 
 const BOON_MAP = new Map(BOONS.map((b) => [b.id, b]));
 export function boon(id: string): BoonDef {

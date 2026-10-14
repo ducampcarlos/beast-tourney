@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import { FACTION_DEFS, bondNeed, boon as boonDef, relic as relicDef, species } from "../engine/data.js";
+import { FACTION_DEFS, bondNeed, boon as boonDef, oath as oathDef, relic as relicDef, species } from "../engine/data.js";
 import { newTrophies } from "../engine/achievements.js";
 import { MAX_ROUNDS, bossName, dominantFaction, enemyTeam, isBossRound } from "../engine/enemy.js";
 import { LIVES, BUY_COST, type Result, type Run, type ShopEvent, buy, buyRelic, fight, move, relicCost, roll, rollCost, sell, sellGold, shopTier, teamUnits, toggleFreeze } from "../engine/run.js";
@@ -26,7 +26,7 @@ const RELIC_X = [800, 890];
 const RELIC_Y = 448;
 const SHOP_RECT = new Phaser.Geom.Rectangle(16, 262, 684, 222);
 
-type Selection = { kind: "unit"; slot: number } | { kind: "offer"; index: number } | { kind: "relic"; index: number } | { kind: "boon"; index: number } | { kind: "enemy"; index: number } | null;
+type Selection = { kind: "oath"; index: number } | { kind: "unit"; slot: number } | { kind: "offer"; index: number } | { kind: "relic"; index: number } | { kind: "boon"; index: number } | { kind: "enemy"; index: number } | null;
 
 export class Shop extends Phaser.Scene {
   private session!: Session;
@@ -191,12 +191,18 @@ export class Shop extends Phaser.Scene {
       if (i >= run.lives) h.setTint(0x3a3040).setAlpha(0.7);
       this.topExtras.push(h);
     }
-    run.boons.forEach((id, i) => {
-      const icon = this.add.image(716 + i * 40, 27, "dungeon", boonDef(id).icon).setScale(2.4).setInteractive({ useHandCursor: true });
-      icon.on("pointerover", () => this.setHover({ kind: "boon", index: i }));
+    // boons, then oaths (tinted red), sharing one row that squeezes when it is crowded
+    const badges = run.boons.length + run.oaths.length;
+    const step = Math.min(40, 226 / Math.max(1, badges));
+    const badge = (i: number, frame: number, selection: Selection, tint?: number) => {
+      const icon = this.add.image(716 + i * step, 27, "dungeon", frame).setScale(2.4).setInteractive({ useHandCursor: true });
+      if (tint) icon.setTint(tint);
+      icon.on("pointerover", () => this.setHover(selection));
       icon.on("pointerout", () => this.setHover(null));
       this.topExtras.push(icon);
-    });
+    };
+    run.boons.forEach((id, i) => badge(i, boonDef(id).icon, { kind: "boon", index: i }));
+    run.oaths.forEach((id, i) => badge(run.boons.length + i, oathDef(id).icon, { kind: "oath", index: i }, 0xff8a80));
     this.goldText.setText(String(run.gold));
   }
 
@@ -326,14 +332,14 @@ export class Shop extends Phaser.Scene {
       lock.on("pointerup", () => this.doFreeze("relic", i));
       this.relicExtras.push(slot, icon, coin, cost, lock);
     });
-    if (this.run.relics.length === 0) this.relicExtras.push(text(this, 830, RELIC_Y, "From round 2", 16, COLOR.muted).setOrigin(0.5));
+    if (this.run.relics.length === 0) this.relicExtras.push(text(this, 830, RELIC_Y, this.run.oaths.includes("bare") ? "Bare Hands: none" : "From round 2", 16, COLOR.muted).setOrigin(0.5));
   }
 
   private refreshEnemy(): void {
     for (const o of this.enemyExtras) o.destroy();
     this.enemyExtras = [];
     const run = this.run;
-    const team = enemyTeam(run.seed, run.round, run.attempt, run.difficulty);
+    const team = enemyTeam(run.seed, run.round, run.attempt, run.difficulty, run.oaths);
     this.enemies = team;
     this.session.noteSeen(team.map((u) => u.sp));
     const boss = bossName(run.round);
@@ -409,6 +415,16 @@ export class Shop extends Phaser.Scene {
         line(`Attack ${foe.atk + (relicBonus?.atk ?? 0)}   Health ${foe.hp + (relicBonus?.hp ?? 0)}`, 18, COLOR.cream, 8);
         if (sp.ability) line(describeAbility(sp.ability, foe.level, sp.faction), 18, COLOR.cream, 8);
         if (relicBonus) line(`${relicBonus.name}: ${relicBonus.text}`, 16, COLOR.blue, 6);
+        return;
+      }
+    }
+    if (target?.kind === "oath") {
+      const id = this.run.oaths[target.index];
+      if (id) {
+        const def = oathDef(id);
+        line(def.name, 22, COLOR.red);
+        line("Oath", 16, COLOR.blue, 6);
+        line(def.text, 18, COLOR.cream);
         return;
       }
     }
@@ -602,7 +618,7 @@ export class Shop extends Phaser.Scene {
     this.selection = null;
     this.rebuildAll();
     this.playEvents(r.events, spot);
-    award(this.registry, newTrophies(this.session.profile.trophies, { team: r.run.team, boons: r.run.boons }));
+    award(this.registry, newTrophies(this.session.profile.trophies, { team: r.run.team, boons: r.run.boons, gold: r.run.gold }));
     flushTrophies(this);
     return true;
   }

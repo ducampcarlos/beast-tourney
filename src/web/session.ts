@@ -140,8 +140,8 @@ export class Session {
     return this.run !== null && this.run.phase === "shop";
   }
 
-  start(difficulty: Difficulty, seed = Math.floor(Math.random() * 0xffffffff)): Run {
-    this.run = newRun(seed, difficulty);
+  start(difficulty: Difficulty, seed = Math.floor(Math.random() * 0xffffffff), oaths: readonly string[] = []): Run {
+    this.run = newRun(seed, difficulty, oaths);
     this.profile.runs++;
     this.noteSeen(this.run.offers.map((o) => o?.sp));
     this.save();
