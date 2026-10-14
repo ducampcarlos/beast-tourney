@@ -3,7 +3,7 @@ import Phaser from "phaser";
 import { FACTION_DEFS, bondNeed, boon as boonDef, relic as relicDef, species } from "../engine/data.js";
 import { newTrophies } from "../engine/achievements.js";
 import { MAX_ROUNDS, bossName, dominantFaction, enemyTeam, isBossRound } from "../engine/enemy.js";
-import { LIVES, BUY_COST, type Result, type Run, type ShopEvent, buy, buyRelic, fight, move, relicCost, roll, rollCost, sell, sellGold, teamUnits, toggleFreeze } from "../engine/run.js";
+import { LIVES, BUY_COST, type Result, type Run, type ShopEvent, buy, buyRelic, fight, move, relicCost, roll, rollCost, sell, sellGold, shopTier, teamUnits, toggleFreeze } from "../engine/run.js";
 import { describeAbility, STATUS_TEXT } from "../engine/text.js";
 import { FACTIONS, SLOTS, type FactionId, type Unit } from "../engine/types.js";
 import type { Audio } from "./audio.js";
@@ -109,6 +109,7 @@ export class Shop extends Phaser.Scene {
     });
     this.exposeDebug();
     flushTrophies(this);
+    this.announceTier();
     if (!this.session.profile.seenHelp && !new URLSearchParams(window.location.search).has("nohelp")) {
       this.session.profile.seenHelp = true;
       this.session.saveProfile();
@@ -618,6 +619,20 @@ export class Shop extends Phaser.Scene {
     this.selection = null;
     this.rebuildAll();
     this.audio.sfx("back", 0.5);
+  }
+
+  /** A new tier of creatures reaching the shop deserves a word, once per round. */
+  private announceTier(): void {
+    const run = this.run;
+    const key = `tier-${run.seed}-${run.round}-${run.attempt}`;
+    if (this.registry.get("tierShown") === key) return;
+    this.registry.set("tierShown", key);
+    const now = shopTier(run);
+    const before = shopTier({ ...run, round: Math.max(1, run.round - 1) });
+    if (run.round > 1 && now > before) {
+      this.time.delayedCall(450, () => toast(this, `Tier ${now} creatures are now for sale!`, COLOR.gold));
+      this.audio.sfx("bell", 0.4, 1.3);
+    }
   }
 
   private toggleMute(): void {

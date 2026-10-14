@@ -42,5 +42,7 @@ export function shoot(scene: Phaser.Scene, from: { x: number; y: number }, to: {
 }
 
 export function shake(scene: Phaser.Scene, strength = 0.004, duration = 120): void {
+  const session = scene.registry.get("session") as { profile: { shake: boolean } } | undefined;
+  if (session && !session.profile.shake) return;
   scene.cameras.main.shake(duration, strength);
 }

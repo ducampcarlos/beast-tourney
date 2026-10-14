@@ -453,14 +453,16 @@ await test("the menu has a working How to play panel", async () => {
 await test("settings: sound, volumes and battle speed are remembered after a reload", async () => {
   const page = await newPage();
   await click(page, { x: 580, y: 470 }); // Settings
-  await click(page, { x: 530, y: 290 }); // Sound off
-  await click(page, { x: 400, y: 170 }); // music -
-  await click(page, { x: 400, y: 170 }); // music -
-  await click(page, { x: 400, y: 226 }); // effects -
-  await click(page, { x: 530, y: 346 }); // speed x2
+  await click(page, { x: 530, y: 262 }); // Sound off
+  await click(page, { x: 530, y: 310 }); // Screen shake off
+  await click(page, { x: 400, y: 166 }); // music -
+  await click(page, { x: 400, y: 166 }); // music -
+  await click(page, { x: 400, y: 214 }); // effects -
+  await click(page, { x: 530, y: 358 }); // speed x2
   await click(page, { x: 590, y: 420 }); // Done
   const saved = await page.evaluate(() => ({ ...window.__tourney.session.profile }));
   assert.equal(saved.muted, true);
+  assert.equal(saved.shake, false);
   assert.equal(saved.speed, 2);
   assert.ok(Math.abs(saved.musicVolume - 0.3) < 0.001, `music ${saved.musicVolume}`);
   assert.ok(Math.abs(saved.sfxVolume - 0.7) < 0.001, `effects ${saved.sfxVolume}`);

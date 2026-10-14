@@ -73,7 +73,7 @@ describe("trophies", () => {
 describe("the saved profile", () => {
   it("starts empty and sound", () => {
     const p = parseProfile(null);
-    expect(p).toMatchObject({ seen: [], trophies: [], muted: false, seenHelp: false, speed: 1, runs: 0 });
+    expect(p).toMatchObject({ seen: [], trophies: [], muted: false, shake: true, seenHelp: false, speed: 1, runs: 0 });
     expect(p.sfxVolume).toBeGreaterThan(0);
     expect(p.musicVolume).toBeGreaterThan(0);
   });
@@ -82,8 +82,8 @@ describe("the saved profile", () => {
     const good = parseProfile(JSON.stringify({ seen: ["wolf", "nope", 5], trophies: ["first-blood", "x", "first-blood"], speed: 4, sfxVolume: 0.3, musicVolume: 0.2, muted: true, seenHelp: true, runs: 3, best: { knight: { round: 9, wins: 2 } } }));
     expect(good).toMatchObject({ seen: ["wolf"], trophies: ["first-blood"], speed: 4, sfxVolume: 0.3, musicVolume: 0.2, muted: true, seenHelp: true, runs: 3 });
     expect(good.best.knight).toEqual({ round: 9, wins: 2 });
-    const bad = parseProfile(JSON.stringify({ speed: 3, sfxVolume: 7, musicVolume: -1, muted: "yes", trophies: "all", best: { knight: { round: 99, wins: 1 } }, runs: -2 }));
-    expect(bad).toMatchObject({ speed: 1, muted: false, trophies: [], runs: 0 });
+    const bad = parseProfile(JSON.stringify({ shake: "no", speed: 3, sfxVolume: 7, musicVolume: -1, muted: "yes", trophies: "all", best: { knight: { round: 99, wins: 1 } }, runs: -2 }));
+    expect(bad).toMatchObject({ speed: 1, muted: false, shake: true, trophies: [], runs: 0 });
     expect(bad.sfxVolume).toBeLessThanOrEqual(1);
     expect(bad.best.knight.round).toBe(0);
   });

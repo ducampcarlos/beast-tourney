@@ -5,7 +5,7 @@ import { FACTION_DEFS, boon as boonDef, relic as relicDef, species } from "../en
 import { bossName, isBossRound } from "../engine/enemy.js";
 import { type FightResult, LIVES, type Run } from "../engine/run.js";
 import { newTrophies } from "../engine/achievements.js";
-import { TRIGGER_TEXT } from "../engine/text.js";
+import { STATUS_TEXT, TRIGGER_TEXT, describeAbility } from "../engine/text.js";
 import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import { burst, ring, shake, shoot } from "./fx.js";
@@ -115,8 +115,49 @@ export class Battle extends Phaser.Scene {
       v.setScale(0.2);
       this.tweens.add({ targets: v, scale: 1, duration: 260 / this.speed, ease: "Back.easeOut" });
     }
+    v.setInteractive(new Phaser.Geom.Rectangle(-42, -48, 84, 104), Phaser.Geom.Rectangle.Contains);
+    v.on("pointerover", () => this.showTip(v));
+    v.on("pointerout", () => this.hideTip());
     this.views.set(u.uid, v);
     return v;
+  }
+
+  private tip: Phaser.GameObjects.GameObject[] = [];
+
+  /** What a creature is and does, as you point at it mid-fight. */
+  private showTip(v: CreatureView): void {
+    this.hideTip();
+    const sp = species(v.spId);
+    const def = FACTION_DEFS[sp.faction];
+    const lines: Array<[string, number, string]> = [
+      [sp.name, 22, COLOR.dark],
+      [`${def.name}  ·  Lv ${v.level}  ·  ${v.atk}/${Math.max(0, v.hp)}`, 16, "#5a3a22"],
+    ];
+    if (sp.ability) lines.push([describeAbility(sp.ability, v.level, sp.faction), 17, "#2a1f1a"]);
+    if (v.relicId) lines.push([`${relicDef(v.relicId).name}: ${relicDef(v.relicId).text}`, 15, "#1d4f7a"]);
+    for (const st of v.statusList) lines.push([STATUS_TEXT[st], 15, "#1d4f7a"]);
+    const width = 250;
+    const texts: Phaser.GameObjects.Text[] = [];
+    let height = 14;
+    for (const [content, size, color] of lines) {
+      const t = text(this, 0, 0, content, size, color, { wordWrap: { width: width - 24 }, lineSpacing: 2 }).setDepth(902);
+      texts.push(t);
+      height += t.height + 5;
+    }
+    const x = Phaser.Math.Clamp(v.x, width / 2 + 8, W - width / 2 - 8);
+    const top = Math.max(64, v.y - 110 - height);
+    const box = panel(this, x - width / 2, top, width, height + 10, "ui_ancient_tan").setDepth(901);
+    let y = top + 12;
+    texts.forEach((t) => {
+      t.setPosition(x - width / 2 + 12, y);
+      y += t.height + 5;
+    });
+    this.tip = [box, ...texts];
+  }
+
+  private hideTip(): void {
+    for (const o of this.tip) o.destroy();
+    this.tip = [];
   }
 
   /** Bring the views in line with a snapshot: create what is missing, remove what is gone, update numbers, close the line up. */
@@ -140,6 +181,7 @@ export class Battle extends Phaser.Scene {
     }
     for (const [uid, v] of this.views) {
       if (!present.has(uid)) {
+        this.hideTip();
         v.destroy();
         this.views.delete(uid);
       }

@@ -16,7 +16,7 @@ export function openSettings(scene: Phaser.Scene, onClose?: () => void): void {
     return o;
   };
   add(scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setDepth(D).setInteractive());
-  add(panel(scene, W / 2 - 330, 70, 660, 400, "ui_ancient_brown").setDepth(D + 1));
+  add(panel(scene, W / 2 - 330, 66, 660, 410, "ui_ancient_brown").setDepth(D + 1));
   add(text(scene, W / 2, 108, "Settings", 38, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(D + 2));
 
   const meter = (label: string, y: number, get: () => number, set: (v: number) => void) => {
@@ -28,28 +28,37 @@ export function openSettings(scene: Phaser.Scene, onClose?: () => void): void {
     add(button(scene, W / 2 - 80, y, "-", () => (set(Math.max(0, Math.round((get() - 0.1) * 10) / 10)), draw()), { w: 44, h: 40, size: 26, color: "grey" }).setDepth(D + 2));
     add(button(scene, W / 2 + 180, y, "+", () => (set(Math.min(1, Math.round((get() + 0.1) * 10) / 10)), draw()), { w: 44, h: 40, size: 26, color: "grey" }).setDepth(D + 2));
   };
-  meter("Music", 170, () => audio.musicVolume, (v) => {
+  meter("Music", 166, () => audio.musicVolume, (v) => {
     audio.setMusicVolume(v);
     session.profile.musicVolume = v;
     session.saveProfile();
   });
-  meter("Effects", 226, () => audio.sfxVolume, (v) => {
+  meter("Effects", 214, () => audio.sfxVolume, (v) => {
     audio.sfxVolume = v;
     session.profile.sfxVolume = v;
     session.saveProfile();
     audio.sfx("coin", 0.6);
   });
 
-  add(text(scene, W / 2 - 290, 290, "Sound", 24, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5).setDepth(D + 2));
-  const mute = add(button(scene, W / 2 + 50, 290, audio.muted ? "Off" : "On", () => {
-    audio.setMuted(!audio.muted);
-    session.profile.muted = audio.muted;
+  const toggle = (label: string, y: number, get: () => boolean, set: (v: boolean) => void, on = "On", off = "Off") => {
+    add(text(scene, W / 2 - 290, y, label, 24, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5).setDepth(D + 2));
+    const b = add(button(scene, W / 2 + 50, y, get() ? on : off, () => {
+      set(!get());
+      b.setLabel(get() ? on : off);
+    }, { w: 150, h: 42, size: 22, color: "blue" }).setDepth(D + 2)) as Button;
+  };
+  toggle("Sound", 262, () => !audio.muted, (v) => {
+    audio.setMuted(!v);
+    session.profile.muted = !v;
     session.saveProfile();
-    mute.setLabel(audio.muted ? "Off" : "On");
-  }, { w: 150, h: 42, size: 22, color: "blue" }).setDepth(D + 2)) as Button;
+  });
+  toggle("Screen shake", 310, () => session.profile.shake, (v) => {
+    session.profile.shake = v;
+    session.saveProfile();
+  });
 
-  add(text(scene, W / 2 - 290, 346, "Battle speed", 24, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5).setDepth(D + 2));
-  const speed = add(button(scene, W / 2 + 50, 346, `x${session.profile.speed}`, () => {
+  add(text(scene, W / 2 - 290, 358, "Battle speed", 24, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5).setDepth(D + 2));
+  const speed = add(button(scene, W / 2 + 50, 358, `x${session.profile.speed}`, () => {
     session.profile.speed = session.profile.speed === 1 ? 2 : session.profile.speed === 2 ? 4 : 1;
     session.saveProfile();
     speed.setLabel(`x${session.profile.speed}`);
@@ -59,7 +68,7 @@ export function openSettings(scene: Phaser.Scene, onClose?: () => void): void {
     for (const o of objects) o.destroy();
     onClose?.();
   };
-  add(button(scene, W / 2 - 110, 420, "Credits", () => overlay(scene, "Credits", CREDITS_LINES), { w: 190, h: 46, size: 22, color: "grey" }).setDepth(D + 2));
-  add(button(scene, W / 2 + 110, 420, "Done", close, { w: 190, h: 46, size: 24, color: "green" }).setDepth(D + 2));
+  add(button(scene, W / 2 - 110, 424, "Credits", () => overlay(scene, "Credits", CREDITS_LINES), { w: 190, h: 46, size: 22, color: "grey" }).setDepth(D + 2));
+  add(button(scene, W / 2 + 110, 424, "Done", close, { w: 190, h: 46, size: 24, color: "green" }).setDepth(D + 2));
   scene.input.keyboard?.once("keydown-ESC", close);
 }

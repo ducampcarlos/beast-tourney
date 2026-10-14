@@ -39,6 +39,8 @@ export interface Profile {
   muted: boolean;
   musicVolume: number;
   sfxVolume: number;
+  /** Screen shake on heavy hits. */
+  shake: boolean;
   /** Battle playback speed: 1, 2 or 4. */
   speed: number;
   runs: number;
@@ -55,6 +57,7 @@ const emptyProfile = (): Profile => ({
   muted: false,
   musicVolume: 0.5,
   sfxVolume: 0.8,
+  shake: true,
   speed: 1,
   runs: 0,
   seenHelp: false,
@@ -110,6 +113,7 @@ export function parseProfile(text: string | null): Profile {
     if (Number.isInteger(raw.runs) && (raw.runs as number) >= 0) base.runs = raw.runs as number;
     if (typeof raw.seenHelp === "boolean") base.seenHelp = raw.seenHelp;
     if (typeof raw.sfxVolume === "number" && raw.sfxVolume >= 0 && raw.sfxVolume <= 1) base.sfxVolume = raw.sfxVolume;
+    if (typeof raw.shake === "boolean") base.shake = raw.shake;
     if (raw.speed === 1 || raw.speed === 2 || raw.speed === 4) base.speed = raw.speed;
     if (Array.isArray(raw.records)) base.records = raw.records.map(validRecord).filter((r): r is RunRecord => r !== null).slice(0, MAX_RECORDS);
     if (Array.isArray(raw.trophies)) base.trophies = [...new Set(raw.trophies.filter((t): t is string => typeof t === "string" && hasTrophy(t)))];

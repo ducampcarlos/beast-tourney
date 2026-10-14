@@ -29,6 +29,7 @@ export class CreatureView extends Phaser.GameObjects.Container {
   atk: number;
   hp: number;
   relicId?: string;
+  statusList: Status[] = [];
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly shadow: Phaser.GameObjects.Image;
   private readonly atkText: Phaser.GameObjects.Text;
@@ -103,6 +104,7 @@ export class CreatureView extends Phaser.GameObjects.Container {
   }
 
   setStatuses(statuses: readonly Status[]): void {
+    this.statusList = [...statuses];
     this.barrier.setVisible(statuses.includes("barrier"));
     this.venom.setVisible(statuses.includes("venom"));
   }
