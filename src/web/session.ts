@@ -8,6 +8,7 @@ import { type Run, newRun } from "../engine/run.js";
 import { parseRun, serializeRun } from "../engine/save.js";
 import { DIFFICULTIES, type Difficulty } from "../engine/types.js";
 import { hasSpecies } from "../engine/data.js";
+import { hasTrophy } from "../engine/achievements.js";
 
 const RUN_KEY = "beast-tourney.run.v1";
 const PROFILE_KEY = "beast-tourney.profile.v1";
@@ -19,8 +20,12 @@ export interface Profile {
   best: Record<Difficulty, { round: number; wins: number }>;
   muted: boolean;
   musicVolume: number;
+  sfxVolume: number;
+  /** Battle playback speed: 1, 2 or 4. */
+  speed: number;
   runs: number;
   seenHelp: boolean;
+  trophies: string[];
 }
 
 const emptyProfile = (): Profile => ({
@@ -28,8 +33,11 @@ const emptyProfile = (): Profile => ({
   best: { squire: { round: 0, wins: 0 }, knight: { round: 0, wins: 0 }, champion: { round: 0, wins: 0 } },
   muted: false,
   musicVolume: 0.5,
+  sfxVolume: 0.8,
+  speed: 1,
   runs: 0,
   seenHelp: false,
+  trophies: [],
 });
 
 function read(key: string): string | null {
@@ -63,6 +71,9 @@ export function parseProfile(text: string | null): Profile {
     if (typeof raw.musicVolume === "number" && raw.musicVolume >= 0 && raw.musicVolume <= 1) base.musicVolume = raw.musicVolume;
     if (Number.isInteger(raw.runs) && (raw.runs as number) >= 0) base.runs = raw.runs as number;
     if (typeof raw.seenHelp === "boolean") base.seenHelp = raw.seenHelp;
+    if (typeof raw.sfxVolume === "number" && raw.sfxVolume >= 0 && raw.sfxVolume <= 1) base.sfxVolume = raw.sfxVolume;
+    if (raw.speed === 1 || raw.speed === 2 || raw.speed === 4) base.speed = raw.speed;
+    if (Array.isArray(raw.trophies)) base.trophies = [...new Set(raw.trophies.filter((t): t is string => typeof t === "string" && hasTrophy(t)))];
     return base;
   } catch {
     return base;
@@ -109,6 +120,16 @@ export class Session {
     this.profile.best[run.difficulty] = { round: Math.max(best.round, reached), wins: best.wins + (run.phase === "won" ? 1 : 0) };
     write(RUN_KEY, null);
     this.saveProfile();
+  }
+
+  /** Record trophies earned and return the ones that are new. */
+  award(ids: string[]): string[] {
+    const fresh = ids.filter((id) => !this.profile.trophies.includes(id));
+    if (fresh.length > 0) {
+      this.profile.trophies.push(...fresh);
+      this.saveProfile();
+    }
+    return fresh;
   }
 
   noteSeen(ids: Array<string | undefined>): void {

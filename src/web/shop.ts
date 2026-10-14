@@ -1,8 +1,9 @@
 import Phaser from "phaser";
 
-import { FACTION_DEFS, RELICS, relic as relicDef, species } from "../engine/data.js";
+import { FACTION_DEFS, bondNeed, boon as boonDef, relic as relicDef, species } from "../engine/data.js";
+import { newTrophies } from "../engine/achievements.js";
 import { BOSS_ROUNDS, MAX_ROUNDS, bossName, dominantFaction, enemyTeam } from "../engine/enemy.js";
-import { BUY_COST, ROLL_COST, type Result, type Run, type ShopEvent, buy, buyRelic, fight, move, roll, sell, sellValue, teamUnits, toggleFreeze } from "../engine/run.js";
+import { LIVES, BUY_COST, type Result, type Run, type ShopEvent, buy, buyRelic, fight, move, relicCost, roll, rollCost, sell, sellGold, teamUnits, toggleFreeze } from "../engine/run.js";
 import { describeAbility, STATUS_TEXT } from "../engine/text.js";
 import { FACTIONS, SLOTS, type FactionId, type Unit } from "../engine/types.js";
 import type { Audio } from "./audio.js";
@@ -10,7 +11,8 @@ import { CreatureView } from "./creature.js";
 import { burst, ring } from "./fx.js";
 import type { Session } from "./session.js";
 import { HELP_LINES } from "./help.js";
-import { COLOR, H, W, backdrop, button, floater, lighten, overlay, panel, text, toast, type Button } from "./ui.js";
+import { award, flushTrophies } from "./toasts.js";
+import { COLOR, H, W, backdrop, button, fadeIn, floater, go, lighten, overlay, panel, text, toast, type Button } from "./ui.js";
 
 // ---- layout --------------------------------------------------------------------------------
 const SLOT_W = 128;
@@ -24,7 +26,7 @@ const RELIC_X = [800, 890];
 const RELIC_Y = 448;
 const SHOP_RECT = new Phaser.Geom.Rectangle(16, 262, 684, 222);
 
-type Selection = { kind: "unit"; slot: number } | { kind: "offer"; index: number } | { kind: "relic"; index: number } | null;
+type Selection = { kind: "unit"; slot: number } | { kind: "offer"; index: number } | { kind: "relic"; index: number } | { kind: "boon"; index: number } | null;
 
 export class Shop extends Phaser.Scene {
   private session!: Session;
@@ -38,7 +40,6 @@ export class Shop extends Phaser.Scene {
   private offerExtras: Phaser.GameObjects.GameObject[] = [];
   private relicExtras: Phaser.GameObjects.GameObject[] = [];
   private relicIcons: Array<Phaser.GameObjects.Image | null> = [];
-  private dynamic: Phaser.GameObjects.GameObject[] = [];
   private enemyExtras: Phaser.GameObjects.GameObject[] = [];
   private infoExtras: Phaser.GameObjects.GameObject[] = [];
   private topExtras: Phaser.GameObjects.GameObject[] = [];
@@ -47,6 +48,8 @@ export class Shop extends Phaser.Scene {
   private goldIcon!: Phaser.GameObjects.Image;
   private fightButton!: Button;
   private rollButton!: Button;
+  private undoButton!: Button;
+  private history: Run[] = [];
   private selection: Selection = null;
   private hover: Selection = null;
   private busy = false;
@@ -64,8 +67,24 @@ export class Shop extends Phaser.Scene {
       return;
     }
     this.run = this.session.run;
+    if (this.run.pendingBoons) {
+      this.scene.start("Boon");
+      return;
+    }
+    fadeIn(this);
+    // A scene object lives on between visits: everything is reset here, not in field initialisers.
+    this.history = [];
     this.teamViews = Array(SLOTS).fill(null);
+    this.slotBgs = [];
     this.offerViews = [];
+    this.offerBgs = [];
+    this.offerExtras = [];
+    this.relicExtras = [];
+    this.relicIcons = [];
+    this.enemyExtras = [];
+    this.infoExtras = [];
+    this.topExtras = [];
+    this.hoverClear = undefined;
     this.selection = null;
     this.hover = null;
     this.busy = false;
@@ -80,12 +99,15 @@ export class Shop extends Phaser.Scene {
     this.input.on("dragend", this.onDragEnd, this);
     this.input.keyboard?.on("keydown-R", () => this.doRoll());
     this.input.keyboard?.on("keydown-F", () => this.doFight());
+    this.input.keyboard?.on("keydown-Z", () => this.doUndo());
+    this.input.keyboard?.on("keydown-M", () => this.toggleMute());
     this.events.once("shutdown", () => {
       this.input.off("dragstart", this.onDragStart, this);
       this.input.off("drag", this.onDrag, this);
       this.input.off("dragend", this.onDragEnd, this);
     });
     this.exposeDebug();
+    flushTrophies(this);
     if (!this.session.profile.seenHelp && !new URLSearchParams(window.location.search).has("nohelp")) {
       this.session.profile.seenHelp = true;
       this.session.saveProfile();
@@ -122,10 +144,11 @@ export class Shop extends Phaser.Scene {
     this.goldText = text(this, 860, 26, "", 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
 
     // buttons
-    this.rollButton = button(this, 118, 514, `Roll  (${ROLL_COST})`, () => this.doRoll(), { w: 200, h: 44, color: "blue", size: 22 }) as Button;
-    button(this, 280, 514, "Menu", () => this.scene.start("Menu"), { w: 100, h: 44, color: "grey", size: 20 });
+    this.rollButton = button(this, 118, 514, "Roll  (1)", () => this.doRoll(), { w: 200, h: 44, color: "blue", size: 22 }) as Button;
+    this.undoButton = button(this, 262, 514, "Undo", () => this.doUndo(), { w: 76, h: 44, color: "yellow", size: 18 }) as Button;
+    button(this, 350, 514, "Menu", () => go(this, "Menu"), { w: 84, h: 44, color: "grey", size: 18 });
     this.fightButton = button(this, 826, 514, "FIGHT!", () => this.doFight(), { w: 220, h: 48, color: "green", size: 28 }) as Button;
-    text(this, 520, 514, "Drag creatures onto the board. Three of a kind merge.", 16, COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0.5);
+    text(this, 566, 514, "Drag creatures onto the board. Three of a kind merge.", 16, COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0.5);
 
     // sell zone (only shown while dragging a team member)
     const zone = this.add.rectangle(SHOP_RECT.centerX, SHOP_RECT.centerY, SHOP_RECT.width - 12, SHOP_RECT.height - 12, 0x7a1f2a, 0.82).setStrokeStyle(4, 0xe0584a);
@@ -145,7 +168,10 @@ export class Shop extends Phaser.Scene {
     this.refreshInfo();
     const any = teamUnits(this.run).length > 0;
     this.fightButton.setEnabled(any);
-    this.rollButton.setEnabled(this.run.gold >= ROLL_COST);
+    const cost = rollCost(this.run);
+    this.rollButton.setLabel(cost === 0 ? "Roll  (free)" : `Roll  (${cost})`);
+    this.rollButton.setEnabled(this.run.gold >= cost);
+    this.undoButton.setEnabled(this.history.length > 0);
   }
 
   private refreshTop(): void {
@@ -157,13 +183,18 @@ export class Shop extends Phaser.Scene {
     this.topExtras.push(round);
     if (boss) this.topExtras.push(text(this, 200, 26, `BOSS: ${bossName(run.round)}`, 22, COLOR.red, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
     // lives as hearts
-    const hearts = LIVES_MAX[run.difficulty];
+    const hearts = Math.max(LIVES[run.difficulty], run.lives);
     for (let i = 0; i < hearts; i++) {
       const h = this.add.image(560 + i * 34, 27, "icons", 195).setScale(2.4);
       if (i >= run.lives) h.setTint(0x3a3040).setAlpha(0.7);
       this.topExtras.push(h);
     }
-    this.topExtras.push(text(this, 700, 26, `${run.wins} win${run.wins === 1 ? "" : "s"}`, 20, COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5));
+    run.boons.forEach((id, i) => {
+      const icon = this.add.image(716 + i * 40, 27, "dungeon", boonDef(id).icon).setScale(2.4).setInteractive({ useHandCursor: true });
+      icon.on("pointerover", () => this.setHover({ kind: "boon", index: i }));
+      icon.on("pointerout", () => this.setHover(null));
+      this.topExtras.push(icon);
+    });
     this.goldText.setText(String(run.gold));
   }
 
@@ -290,7 +321,7 @@ export class Shop extends Phaser.Scene {
       });
       this.relicIcons.push(icon);
       const coin = this.add.image(RELIC_X[i]! - 12, RELIC_Y + 34, "coin").setScale(1.6);
-      const cost = text(this, RELIC_X[i]! - 2, RELIC_Y + 34, String(def.cost), 18, this.run.gold >= def.cost ? COLOR.gold : COLOR.red, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5);
+      const cost = text(this, RELIC_X[i]! - 2, RELIC_Y + 34, String(relicCost(this.run, def)), 18, this.run.gold >= relicCost(this.run, def) ? COLOR.gold : COLOR.red, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5);
       const lock = this.add.image(RELIC_X[i]! + 26, RELIC_Y - 28, "icons", 193).setScale(1.4).setAlpha(offer.frozen ? 1 : 0.35).setInteractive({ useHandCursor: true }).setDepth(20);
       lock.on("pointerup", () => this.doFreeze("relic", i));
       this.relicExtras.push(slot, icon, coin, cost, lock);
@@ -364,6 +395,16 @@ export class Shop extends Phaser.Scene {
         return;
       }
     }
+    if (target?.kind === "boon") {
+      const id = this.run.boons[target.index];
+      if (id) {
+        const def = boonDef(id);
+        line(def.name, 22, COLOR.gold);
+        line("Boon", 16, COLOR.blue, 6);
+        line(def.text, 18, COLOR.cream);
+        return;
+      }
+    }
     if (target?.kind === "relic") {
       const offer = this.run.relics[target.index];
       if (offer) {
@@ -380,7 +421,7 @@ export class Shop extends Phaser.Scene {
   private sellButton(slot: number): void {
     const unit = this.run.team[slot];
     if (!unit) return;
-    const b = button(this, 830, 382, `Sell  +${sellValue(unit)}`, () => this.doSell(slot), { w: 200, h: 36, color: "red", size: 18 });
+    const b = button(this, 830, 382, `Sell  +${sellGold(this.run, unit)}`, () => this.doSell(slot), { w: 200, h: 36, color: "red", size: 18 });
     this.infoExtras.push(b);
   }
 
@@ -396,7 +437,8 @@ export class Shop extends Phaser.Scene {
     }
     const active = FACTIONS.filter((f) => counts.has(f)).sort((a, b) => counts.get(b)!.size - counts.get(a)!.size);
     if (active.length === 0) {
-      const t = text(this, x, y, "Field creatures of the same faction to awaken bonds: 2 and 4 different kinds.", 17, COLOR.cream, { wordWrap: { width: 204 } });
+      const needs = [bondNeed(2, this.run.boons), bondNeed(4, this.run.boons)];
+      const t = text(this, x, y, `Field creatures of the same faction to awaken bonds: ${needs[0]} and ${needs[1]} different kinds.`, 17, COLOR.cream, { wordWrap: { width: 204 } });
       add(t);
       return;
     }
@@ -404,12 +446,14 @@ export class Shop extends Phaser.Scene {
       const def = FACTION_DEFS[f];
       const n = counts.get(f)!.size;
       add(text(this, x, y, `${def.name}`, 18, lighten(def.color, 0.5), { stroke: "#2a1f1a", strokeThickness: 3 }));
-      // pips: filled up to n, notches at 2 and 4
-      for (let i = 0; i < 4; i++) {
+      // pips: filled up to n, with a gold edge on the ones that complete a bond
+      const needLow = bondNeed(def.bonds[0].need, this.run.boons);
+      const needHigh = bondNeed(def.bonds[1].need, this.run.boons);
+      for (let i = 0; i < needHigh; i++) {
         const on = i < n;
-        add(this.add.rectangle(x + 108 + i * 18, y + 10, 12, 12, on ? def.color : 0x3b2a1a).setStrokeStyle(2, i === 1 || i === 3 ? 0xf2c14e : 0x2a1f1a));
+        add(this.add.rectangle(x + 108 + i * 18, y + 10, 12, 12, on ? def.color : 0x3b2a1a).setStrokeStyle(2, i === needLow - 1 || i === needHigh - 1 ? 0xf2c14e : 0x2a1f1a));
       }
-      const tier = n >= def.bonds[1].need ? def.bonds[1] : n >= def.bonds[0].need ? def.bonds[0] : null;
+      const tier = n >= needHigh ? def.bonds[1] : n >= needLow ? def.bonds[0] : null;
       const tt = text(this, x, y + 20, tier ? tier.text : `Next: ${def.bonds[0].text}`, 15, tier ? COLOR.cream : COLOR.muted, { wordWrap: { width: 204 } });
       add(tt);
       y += 22 + tt.height + 4;
@@ -473,7 +517,7 @@ export class Shop extends Phaser.Scene {
     this.audio.sfx("pluck", 0.4);
     if (o.getData("kind") === "unit") {
       const unit = this.run.team[o.getData("slot") as number];
-      if (unit) this.showSellZone(`SELL  +${sellValue(unit)} gold`);
+      if (unit) this.showSellZone(`SELL  +${sellGold(this.run, unit)} gold`);
     }
   }
 
@@ -535,12 +579,34 @@ export class Shop extends Phaser.Scene {
       this.audio.sfx("error", 0.45);
       return false;
     }
+    this.history.push(this.run);
     this.run = r.run;
     this.session.update(r.run);
     this.selection = null;
     this.rebuildAll();
     this.playEvents(r.events, spot);
+    award(this.registry, newTrophies(this.session.profile.trophies, { team: r.run.team, boons: r.run.boons }));
+    flushTrophies(this);
     return true;
+  }
+
+  /** Take back the last thing done this turn. A roll comes back identical if rolled again: the seed fixes it. */
+  private doUndo(): void {
+    if (this.busy) return;
+    const previous = this.history.pop();
+    if (!previous) return;
+    this.run = previous;
+    this.session.update(previous);
+    this.selection = null;
+    this.rebuildAll();
+    this.audio.sfx("back", 0.5);
+  }
+
+  private toggleMute(): void {
+    this.audio.setMuted(!this.audio.muted);
+    this.session.profile.muted = this.audio.muted;
+    this.session.saveProfile();
+    toast(this, this.audio.muted ? "Sound off" : "Sound on", COLOR.cream);
   }
 
   private doBuy(offerIndex: number, slot: number): boolean {
@@ -594,7 +660,7 @@ export class Shop extends Phaser.Scene {
     }
     this.busy = true;
     this.audio.sfx("draw", 0.6);
-    this.scene.start("Battle", { before: this.run, result });
+    go(this, "Battle", { before: this.run, result });
   }
 
   // ---- feedback -------------------------------------------------------------------------
@@ -640,6 +706,8 @@ export class Shop extends Phaser.Scene {
       cardY: CARD_Y,
       relicX: RELIC_X,
       relicY: RELIC_Y,
+      undo: () => this.doUndo(),
+      history: () => this.history.length,
       reload: () => {
         this.run = this.session.run!;
         this.rebuildAll(true);
@@ -648,5 +716,3 @@ export class Shop extends Phaser.Scene {
   }
 }
 
-const LIVES_MAX = { squire: 5, knight: 4, champion: 3 } as const;
-void RELICS;

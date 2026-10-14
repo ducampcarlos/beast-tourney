@@ -21,7 +21,7 @@ export const DIFFICULTY_MULT: Record<Difficulty, number> = { squire: 0.88, knigh
  * health. Teams are generated first, then scaled to this curve, so a lucky draw of high-tier
  * creatures cannot spike a round. Calibrated against the bots in `npm run balance`.
  */
-export const POWER: readonly number[] = [8, 16, 27, 45, 43, 49, 58, 78, 74, 85, 99, 134];
+export const POWER: readonly number[] = [8, 16, 27, 44, 43, 49, 57, 77, 74, 85, 99, 136];
 /** Overall multiplier on the curve, exposed so the simulator can sweep it. */
 export const TUNING = { scale: 1 };
 

@@ -5,7 +5,7 @@
 
 import { RELICS, relic as relicDef, species as speciesDef } from "../engine/data.js";
 import { Rng, hashSeed } from "../engine/rng.js";
-import { BUY_COST, type Result, type Run, buy, buyRelic, fight, move, roll, sell, teamUnits } from "../engine/run.js";
+import { BUY_COST, type Result, type Run, buy, buyRelic, chooseBoon, fight, move, roll, sell, teamUnits } from "../engine/run.js";
 import { type FactionId, SLOTS, type Unit } from "../engine/types.js";
 
 export type Skill = "random" | "greedy";
@@ -140,6 +140,17 @@ function playRandom(start: Run, rng: Rng): Run {
   return run;
 }
 
+/** What the bots take first. A fixed order is crude, but it is what a player who has not thought much would roughly do. */
+const BOON_ORDER = ["tonic", "purse", "mentor", "bulwark", "ember", "lucky", "scholar", "market", "bond-sage", "second-wind", "thrift", "haggler"];
+
+function pickBoon(run: Run, skill: Skill): Run {
+  const options = run.pendingBoons ?? [];
+  const id = skill === "greedy" ? [...options].sort((a, b) => BOON_ORDER.indexOf(a) - BOON_ORDER.indexOf(b))[0]! : options[0]!;
+  const r = chooseBoon(run, id);
+  if (!r.ok) throw new Error(r.error);
+  return r.run;
+}
+
 export interface RunLog {
   finalRound: number;
   won: boolean;
@@ -163,6 +174,7 @@ export function playRun(start: Run, skill: Skill, botSeed = 1): { run: Run; log:
     const sum = (us: Unit[]) => us.reduce((a, u) => a + u.atk + u.hp, 0);
     log.fights.push({ round, outcome: r.battle.outcome, species, power: sum(teamUnits(run)), enemyPower: sum(r.enemy) });
     run = r.run;
+    if (run.pendingBoons) run = pickBoon(run, skill);
   }
   log.finalRound = run.round;
   log.won = run.phase === "won";

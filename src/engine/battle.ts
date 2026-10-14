@@ -9,7 +9,7 @@
  * attacks lethal. Bonds and relics are applied before the first clash.
  */
 
-import { FACTION_DEFS, relic as relicDef, species as speciesDef } from "./data.js";
+import { FACTION_DEFS, bondNeed, relic as relicDef, species as speciesDef } from "./data.js";
 import { Rng } from "./rng.js";
 import { type Slotted, selectAllies, selectEnemies } from "./targets.js";
 import { type Ability, type Effect, FACTIONS, type FactionId, type RelicDef, SLOTS, type Species, type Status, type Trigger, type Unit } from "./types.js";
@@ -34,6 +34,7 @@ export interface UnitView {
 
 export type BattleEvent =
   | { t: "bond"; side: Side; faction: FactionId; need: number }
+  | { t: "boon"; id: string }
   | { t: "trigger"; uid: number; trigger: Trigger }
   | { t: "clash"; a: number; b: number }
   | { t: "damage"; uid: number; amount: number; src?: number }
@@ -76,8 +77,13 @@ interface BUnit extends Slotted {
 
 const scale = (n: number | undefined, level: number): number => (n ?? 0) * level;
 
-export function simulateBattle(player: readonly Unit[], enemy: readonly Unit[], seed: number): BattleResult {
-  return new Battle(player, enemy, seed).run();
+export interface BattleOptions {
+  /** Boons the player holds; the enemy never has any. */
+  boons?: readonly string[];
+}
+
+export function simulateBattle(player: readonly Unit[], enemy: readonly Unit[], seed: number, options: BattleOptions = {}): BattleResult {
+  return new Battle(player, enemy, seed, options.boons ?? []).run();
 }
 
 class Battle {
@@ -87,11 +93,12 @@ class Battle {
   private events: BattleEvent[] = [];
   private readonly hurtQueue: BUnit[] = [];
   private readonly bondRevive: [number, number] = [0, 0];
+  private boonRevive = 0;
   private budget = TRIGGER_BUDGET;
   private nextUid = SUMMON_UID_BASE;
   private clashes = 0;
 
-  constructor(player: readonly Unit[], enemy: readonly Unit[], seed: number) {
+  constructor(player: readonly Unit[], enemy: readonly Unit[], seed: number, private readonly boons: readonly string[]) {
     this.rng = new Rng(seed);
     this.teams = [player.slice(0, SLOTS).map((u) => this.make(u, 0, 0)), enemy.slice(0, SLOTS).map((u) => this.make(u, 1, ENEMY_UID_BASE))];
   }
@@ -238,7 +245,10 @@ class Battle {
       for (const ally of [...own]) if (ally.hp > 0) this.fire(ally, "allyFaint");
       const killer = [...this.teams[0], ...this.teams[1]].find((u) => u.uid === dead.killedBy);
       if (killer && killer.hp > 0 && killer.side !== dead.side) this.fire(killer, "kill");
-      if (this.bondRevive[dead.side] > 0 && !dead.revived && dead.faction === "undead" && !dead.sp.id.startsWith("bones")) {
+      if (dead.side === 0 && this.boonRevive > 0 && !dead.revived && dead.sp.tier > 0) {
+        this.revive(dead, this.boonRevive, index);
+        this.boonRevive = 0; // once per battle
+      } else if (this.bondRevive[dead.side] > 0 && !dead.revived && dead.faction === "undead" && dead.sp.tier > 0) {
         this.revive(dead, this.bondRevive[dead.side], index);
         this.bondRevive[dead.side] = 0; // once per battle
       }
@@ -261,7 +271,8 @@ class Battle {
       for (const faction of FACTIONS) {
         const members = new Set(team.filter((u) => u.faction === faction && u.sp.tier > 0).map((u) => u.sp.id));
         const def = FACTION_DEFS[faction];
-        const tier = [...def.bonds].reverse().find((b) => members.size >= b.need);
+        const held = side === 0 ? this.boons : [];
+        const tier = [...def.bonds].reverse().find((b) => members.size >= bondNeed(b.need, held));
         if (!tier) continue;
         this.emit({ t: "bond", side, faction, need: tier.need });
         const anchor = team.find((u) => u.faction === faction)!;
@@ -271,9 +282,27 @@ class Battle {
     }
   }
 
+  private applyBoons(): void {
+    const team = this.teams[0];
+    if (team.length === 0) return;
+    if (this.boons.includes("tonic")) {
+      this.emit({ t: "boon", id: "tonic" });
+      this.apply(team[0]!, { kind: "buff", to: "all", atk: 1, hp: 1 }, undefined, 1);
+    }
+    if (this.boons.includes("bulwark")) {
+      this.emit({ t: "boon", id: "bulwark" });
+      this.grant(team[0]!, "barrier");
+    }
+    if (this.boons.includes("ember")) {
+      this.emit({ t: "boon", id: "ember" });
+      this.boonRevive = 0.5;
+    }
+  }
+
   run(): BattleResult {
     this.snapshot("The teams line up.");
     this.applyBonds();
+    this.applyBoons();
     this.snapshot("Bonds awaken.");
 
     const order = [...this.teams[0], ...this.teams[1]].map((u, i) => ({ u, i })).sort((a, b) => b.u.atk - a.u.atk || a.u.side - b.u.side || a.i - b.i).map((x) => x.u);

@@ -51,6 +51,14 @@ for (const difficulty of DIFFICULTIES) {
     const total = [...usage.values()].reduce((a, b) => a + b.n, 0);
     console.log("\n  creature winrate (battles from round 5, knight):");
     for (const { s, e } of rows) console.log(`   ${s.name.padEnd(20)} T${s.tier} ${s.faction.padEnd(9)} used ${String(e.n).padStart(5)} (${((e.n / Math.max(1, total)) * 100).toFixed(1)}%)  win ${e.n ? ((e.wins / e.n) * 100).toFixed(0) : "-"}%`);
+    const byFaction = new Map<string, { n: number; wins: number }>();
+    for (const { s, e } of rows) {
+      const f = byFaction.get(s.faction) ?? { n: 0, wins: 0 };
+      f.n += e.n;
+      f.wins += e.wins;
+      byFaction.set(s.faction, f);
+    }
+    console.log("  faction winrate (same sample): " + [...byFaction.entries()].map(([f, e]) => `${f} ${Math.round((e.wins / Math.max(1, e.n)) * 100)}%`).join("  "));
     console.log("");
   }
 }

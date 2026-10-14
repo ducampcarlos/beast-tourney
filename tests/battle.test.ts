@@ -194,7 +194,7 @@ describe("abilities", () => {
   it("uses the strongest/weakest/front/back selectors on the right side", () => {
     const foes = [unit("bones", 1, 30), unit("sprout", 7, 30), unit("wisp", 3, 30)];
     const giant = unit("giant", 1, 99);
-    const hit = events(fight([giant], foes)).find((e) => e.t === "damage" && e.src === giant.uid && e.amount === 8) as { uid: number };
+    const hit = events(fight([giant], foes)).find((e) => e.t === "damage" && e.src === giant.uid && e.amount === 9) as { uid: number };
     expect(hit.uid).toBe(foe(foes[1]!)); // the strongest (attack 7)
     const eagle = unit("eagle", 1, 99);
     const dive = events(fight([eagle], foes)).find((e) => e.t === "damage" && e.src === eagle.uid && e.amount === 6) as { uid: number };

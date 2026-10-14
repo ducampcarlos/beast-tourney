@@ -1,15 +1,17 @@
 import Phaser from "phaser";
 
 import type { BattleEvent, BattleStep, UnitView } from "../engine/battle.js";
-import { FACTION_DEFS, relic as relicDef, species } from "../engine/data.js";
+import { FACTION_DEFS, boon as boonDef, relic as relicDef, species } from "../engine/data.js";
 import { BOSS_ROUNDS, bossName } from "../engine/enemy.js";
-import type { FightResult, Run } from "../engine/run.js";
+import { type FightResult, LIVES, type Run } from "../engine/run.js";
+import { newTrophies } from "../engine/achievements.js";
 import { TRIGGER_TEXT } from "../engine/text.js";
 import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import { burst, ring, shake, shoot } from "./fx.js";
 import type { Session } from "./session.js";
-import { COLOR, H, W, backdrop, button, floater, panel, text, type Button } from "./ui.js";
+import { award, flushTrophies } from "./toasts.js";
+import { COLOR, H, W, backdrop, button, fadeIn, floater, go, panel, text, type Button } from "./ui.js";
 
 type OkFight = Extract<FightResult, { ok: true }>;
 
@@ -41,7 +43,7 @@ export class Battle extends Phaser.Scene {
     this.before = data.before;
     this.result = data.result;
     this.views = new Map();
-    this.speed = 1;
+    this.speed = (this.registry.get("session") as Session).profile.speed;
     this.skipRequested = false;
     this.finished = false;
     this.bondTags = [];
@@ -51,6 +53,7 @@ export class Battle extends Phaser.Scene {
     this.session = this.registry.get("session") as Session;
     this.audio = this.registry.get("audio") as Audio;
     const boss = BOSS_ROUNDS.includes(this.before.round);
+    fadeIn(this);
     this.audio.music(boss ? "boss" : "battle");
     backdrop(this, 1.5);
     // the arena: a worn patch of floor with a line down the middle
@@ -63,7 +66,7 @@ export class Battle extends Phaser.Scene {
     const name = bossName(this.before.round);
     text(this, W / 2, 26, name ? `BOSS: ${name}` : "Battle", 26, name ? COLOR.red : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0.5);
 
-    this.speedButton = button(this, 770, 26, "Speed x1", () => this.cycleSpeed(), { w: 150, h: 38, size: 18, color: "blue" }) as Button;
+    this.speedButton = button(this, 770, 26, `Speed x${this.speed}`, () => this.cycleSpeed(), { w: 150, h: 38, size: 18, color: "blue" }) as Button;
     this.skipButton = button(this, 886, 26, "Skip", () => this.skip(), { w: 100, h: 38, size: 18, color: "grey" }) as Button;
     this.input.keyboard?.on("keydown-SPACE", () => this.cycleSpeed());
     this.input.keyboard?.on("keydown-ESC", () => this.skip());
@@ -80,6 +83,8 @@ export class Battle extends Phaser.Scene {
   private cycleSpeed(): void {
     this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 4 : 1;
     this.speedButton.setLabel(`Speed x${this.speed}`);
+    this.session.profile.speed = this.speed;
+    this.session.saveProfile();
   }
 
   private skip(): void {
@@ -172,10 +177,10 @@ export class Battle extends Phaser.Scene {
 
   private async playStep(step: BattleStep): Promise<void> {
     const clash = step.events.find((e): e is Extract<BattleEvent, { t: "clash" }> => e.t === "clash");
-    const hasBond = step.events.some((e) => e.t === "bond");
+    const hasBond = step.events.some((e) => e.t === "bond" || e.t === "boon");
     if (hasBond) await this.playBonds(step.events);
     if (clash) await this.playClash(step, clash);
-    else for (const e of step.events) if (e.t !== "bond") await this.playEvent(e);
+    else for (const e of step.events) if (e.t !== "bond" && e.t !== "boon") await this.playEvent(e);
   }
 
   private async playBonds(events: BattleEvent[]): Promise<void> {
@@ -192,7 +197,14 @@ export class Battle extends Phaser.Scene {
       this.tweens.add({ targets: tag, alpha: 1, duration: 250 / this.speed });
       this.audio.sfx("bell", 0.25, 1.4);
     }
-    if (bonds.length > 0) await this.wait(520);
+    let boonRow = 0;
+    for (const e of events) {
+      if (e.t !== "boon") continue;
+      const tag = text(this, 24, 78 + (perSide[0]! + boonRow++) * 32, `Boon: ${boonDef(e.id).name}`, 24, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5).setDepth(300).setAlpha(0);
+      this.bondTags.push(tag);
+      this.tweens.add({ targets: tag, alpha: 1, duration: 250 / this.speed });
+    }
+    if (bonds.length + boonRow > 0) await this.wait(520);
   }
 
   private async playClash(step: BattleStep, clash: Extract<BattleEvent, { t: "clash" }>): Promise<void> {
@@ -288,15 +300,16 @@ export class Battle extends Phaser.Scene {
         const target = this.view(e.uid);
         const src = e.src !== undefined ? this.view(e.src) : undefined;
         if (!target) return;
+        const look = src ? attackLook(src.spId) : attackLook("");
         if (src) {
           await new Promise<void>((resolve) => {
             if (this.skipRequested) return resolve();
-            shoot(this, { x: src.x, y: src.y - 10 }, { x: target.x, y: target.y - 10 }, "fx_flame_03", 0xffa860, 240 / this.speed, () => resolve());
+            shoot(this, { x: src.x, y: src.y - 10 }, { x: target.x, y: target.y - 10 }, look.shot, look.tint, 240 / this.speed, () => resolve());
           });
         }
         this.applyDamage(e);
-        this.audio.sfx("hit_soft", 0.45);
-        burst(this, target.x, target.y, "fx_flame_01", 6, 0xffa860, 120);
+        this.audio.sfx(look.sound, 0.45);
+        burst(this, target.x, target.y, look.burst, 6, look.tint, 120);
         await this.wait(140);
         return;
       }
@@ -345,6 +358,8 @@ export class Battle extends Phaser.Scene {
     const final = after.phase !== "shop";
     for (const t of this.bondTags) t.destroy();
 
+    const bonds = this.result.battle.steps.flatMap((st) => st.events).filter((e): e is Extract<BattleEvent, { t: "bond" }> => e.t === "bond" && e.side === 0).map((e) => e.need);
+    award(this.registry, newTrophies(this.session.profile.trophies, { battle: { outcome, round: this.before.round, bonds }, team: after.team, boons: after.boons }));
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(800);
     this.tweens.add({ targets: dim, fillAlpha: 0.55, duration: 300 });
     const title = outcome === "win" ? "VICTORY!" : outcome === "lose" ? "DEFEAT" : "DRAW";
@@ -369,7 +384,7 @@ export class Battle extends Phaser.Scene {
 
     // hearts
     const hearts = this.add.container(0, 0).setDepth(820);
-    const max = { squire: 5, knight: 4, champion: 3 }[after.difficulty];
+    const max = Math.max(LIVES[after.difficulty], after.lives, this.before.lives);
     for (let i = 0; i < max; i++) {
       const h = this.add.image(W / 2 - ((max - 1) * 36) / 2 + i * 36, 346, "icons", 195).setScale(2.6);
       if (i >= after.lives) h.setTint(0x3a3040);
@@ -389,9 +404,13 @@ export class Battle extends Phaser.Scene {
     this.session.update(after);
     if (after.phase !== "shop") {
       this.session.finish();
-      this.scene.start("End", { run: after, history: after.history });
+      award(this.registry, newTrophies(this.session.profile.trophies, { end: { won: after.phase === "won", difficulty: after.difficulty, lives: after.lives, lost: after.history.some((h) => h.outcome === "lose") } }));
+      award(this.registry, newTrophies(this.session.profile.trophies, { seen: this.session.profile.seen.length }));
+      go(this, "End", { run: after });
+    } else if (after.pendingBoons) {
+      go(this, "Boon");
     } else {
-      this.scene.start("Shop");
+      go(this, "Shop");
     }
   }
 
@@ -401,4 +420,17 @@ export class Battle extends Phaser.Scene {
     w.__tourney.battle = { result: () => this.result, finished: () => this.finished, skip: () => this.skip(), views: () => this.views.size };
   }
 }
-void relicDef;
+
+/** What an ability's damage looks like, by the faction of whoever dealt it. */
+function attackLook(spId: string): { shot: string; burst: string; tint: number; sound: "hit_soft" | "glass" | "slice" | "clang" } {
+  const faction = spId ? species(spId).faction : "";
+  switch (faction) {
+    case "undead": return { shot: "fx_magic_03", burst: "fx_smoke_01", tint: 0xb090ff, sound: "hit_soft" };
+    case "fae": return { shot: "fx_spark_05", burst: "fx_star_04", tint: 0x9dffb0, sound: "glass" };
+    case "elemental": return { shot: "fx_magic_01", burst: "fx_light_01", tint: 0x7fd4ff, sound: "glass" };
+    case "order": return { shot: "fx_light_01", burst: "fx_star_01", tint: 0xffe9a0, sound: "clang" };
+    case "wildkin": return { shot: "fx_slash_02", burst: "fx_spark_02", tint: 0xffd0a0, sound: "slice" };
+    case "horde": return { shot: "fx_flame_01", burst: "fx_flame_01", tint: 0xa8d24a, sound: "hit_soft" };
+    default: return { shot: "fx_flame_03", burst: "fx_flame_01", tint: 0xffa860, sound: "hit_soft" };
+  }
+}

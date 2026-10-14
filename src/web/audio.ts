@@ -15,6 +15,7 @@ export class Audio {
   private currentKey: MusicKey | null = null;
   muted = false;
   musicVolume = 0.5;
+  sfxVolume = 0.8;
 
   constructor(private readonly game: Phaser.Game) {}
 
@@ -54,6 +55,6 @@ export class Audio {
 
   sfx(key: SfxKey, volume = 0.6, rate = 1): void {
     if (!this.game.cache.audio.exists(key)) return;
-    this.game.sound.play(key, { volume, rate: rate * (0.95 + Math.random() * 0.1) });
+    this.game.sound.play(key, { volume: volume * this.sfxVolume * 1.25, rate: rate * (0.95 + Math.random() * 0.1) });
   }
 }

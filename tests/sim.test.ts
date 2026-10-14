@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MAX_ROUNDS } from "../src/engine/enemy.js";
 import { Rng } from "../src/engine/rng.js";
-import { buy, buyRelic, fight, move, newRun, roll, sell, teamUnits, toggleFreeze, type Run } from "../src/engine/run.js";
+import { buy, buyRelic, chooseBoon, fight, move, newRun, roll, sell, teamUnits, toggleFreeze, type Run } from "../src/engine/run.js";
 import { parseRun, serializeRun } from "../src/engine/save.js";
 import { DIFFICULTIES, SLOTS } from "../src/engine/types.js";
 import { playRun } from "../src/sim/bots.js";
@@ -48,6 +48,12 @@ describe("bots play full runs", () => {
       if (!r.ok) throw new Error(r.error);
       run = parseRun(serializeRun(r.run))!;
       expect(run).toEqual(r.run);
+      if (run.pendingBoons) {
+        const c = chooseBoon(run, run.pendingBoons[0]!);
+        if (!c.ok) throw new Error(c.error);
+        run = parseRun(serializeRun(c.run))!;
+        expect(run).toEqual(c.run);
+      }
     }
   });
 });
@@ -69,6 +75,10 @@ describe("random command fuzzing", () => {
         else {
           const f = fight(run);
           if (f.ok) run = f.run;
+          if (run.pendingBoons) {
+            const c = chooseBoon(run, run.pendingBoons[rng.int(run.pendingBoons.length)]!);
+            if (c.ok) run = c.run;
+          }
         }
         if (result?.ok && result.run) run = result.run;
         invariants(run);
@@ -89,10 +99,10 @@ describe("balance bands (guards against accidental power creep)", () => {
     const squire = winRate("squire", 300);
     const knight = winRate("knight", 300);
     const champion = winRate("champion", 300);
-    expect(squire).toBeGreaterThan(0.3);
-    expect(squire).toBeLessThan(0.75);
-    expect(knight).toBeGreaterThan(0.07);
-    expect(knight).toBeLessThan(0.3);
+    expect(squire).toBeGreaterThan(0.35);
+    expect(squire).toBeLessThan(0.8);
+    expect(knight).toBeGreaterThan(0.08);
+    expect(knight).toBeLessThan(0.32);
     expect(champion).toBeLessThan(0.1);
     expect(squire).toBeGreaterThan(knight);
     expect(knight).toBeGreaterThan(champion);

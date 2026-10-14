@@ -6,8 +6,9 @@ import { DIFFICULTIES, type Difficulty } from "../engine/types.js";
 import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import type { Session } from "./session.js";
-import { CREDITS_LINES, HELP_LINES } from "./help.js";
-import { COLOR, H, W, backdrop, button, overlay, panel, text, type Button } from "./ui.js";
+import { HELP_LINES } from "./help.js";
+import { openSettings } from "./settings.js";
+import { COLOR, H, W, backdrop, button, fadeIn, go, overlay, panel, text, type Button } from "./ui.js";
 
 const BLURB: Record<Difficulty, string> = {
   squire: "Gentle opponents and five lives. A good first tournament.",
@@ -27,6 +28,8 @@ export class Menu extends Phaser.Scene {
   create(): void {
     const session = this.registry.get("session") as Session;
     const audio = this.registry.get("audio") as Audio;
+    fadeIn(this);
+    this.pickButtons = new Map();
     audio.music("menu");
     this.difficulty = (this.registry.get("difficulty") as Difficulty | undefined) ?? "knight";
     backdrop(this);
@@ -55,19 +58,14 @@ export class Menu extends Phaser.Scene {
 
     if (session.hasSavedRun()) {
       const r = session.run!;
-      button(this, W / 2, 376, `Continue (round ${r.round}, ${r.lives} lives)`, () => this.scene.start("Shop"), { w: 400, h: 44, color: "yellow", size: 20 });
+      button(this, W / 2, 376, `Continue (round ${r.round}, ${r.lives} lives)`, () => go(this, "Shop"), { w: 400, h: 44, color: "yellow", size: 20 });
     } else {
       button(this, W / 2, 376, "Daily Run", () => this.begin(session, dailySeed(), "knight"), { w: 280, h: 44, color: "blue", size: 22 });
     }
-    button(this, W / 2 - 100, 424, "Bestiary", () => this.scene.start("Bestiary"), { w: 190, h: 40, color: "blue", size: 20 });
-    const sound = button(this, W / 2 + 100, 424, audio.muted ? "Sound: off" : "Sound: on", () => {
-      audio.setMuted(!audio.muted);
-      session.profile.muted = audio.muted;
-      session.saveProfile();
-      sound.setLabel(audio.muted ? "Sound: off" : "Sound: on");
-    }, { w: 190, h: 40, color: "blue", size: 20 }) as Button;
+    button(this, W / 2 - 100, 424, "Bestiary", () => go(this, "Bestiary"), { w: 190, h: 40, color: "blue", size: 20 });
+    button(this, W / 2 + 100, 424, "Trophies", () => go(this, "Trophies"), { w: 190, h: 40, color: "blue", size: 20 });
     button(this, W / 2 - 100, 470, "How to play", () => overlay(this, "How to play", HELP_LINES), { w: 190, h: 40, color: "grey", size: 20 });
-    button(this, W / 2 + 100, 470, "Credits", () => overlay(this, "Credits", CREDITS_LINES), { w: 190, h: 40, color: "grey", size: 20 });
+    button(this, W / 2 + 100, 470, "Settings", () => openSettings(this), { w: 190, h: 40, color: "grey", size: 20 });
 
     // record
     const best = session.profile.best[this.difficulty];
@@ -93,7 +91,7 @@ export class Menu extends Phaser.Scene {
 
   private begin(session: Session, seed?: number, difficulty: Difficulty = this.difficulty): void {
     session.start(difficulty, seed);
-    this.scene.start("Shop");
+    go(this, "Shop");
   }
 
   private parade(): void {

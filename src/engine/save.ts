@@ -4,7 +4,7 @@
  * smuggling in impossible creatures.
  */
 
-import { hasRelic, hasSpecies, species } from "./data.js";
+import { hasBoon, hasRelic, hasSpecies, species } from "./data.js";
 import { LIVES, type Run } from "./run.js";
 import { DIFFICULTIES, LEVEL_EXP, MAX_LEVEL, SLOTS, type Unit } from "./types.js";
 import { MAX_ROUNDS } from "./enemy.js";
@@ -42,7 +42,7 @@ export function parseRun(text: string): Run | null {
   if (typeof difficulty !== "string" || !(DIFFICULTIES as readonly string[]).includes(difficulty)) return null;
   const d = difficulty as Run["difficulty"];
   const { seed, round, attempt, lives, wins, gold, rng, nextUid, phase } = raw;
-  if (!isInt(seed, 0, 0xffffffff) || !isInt(round, 1, MAX_ROUNDS) || !isInt(attempt, 0, 50) || !isInt(lives, 0, LIVES.squire) || !isInt(wins, 0, 200)) return null;
+  if (!isInt(seed, 0, 0xffffffff) || !isInt(round, 1, MAX_ROUNDS) || !isInt(attempt, 0, 50) || !isInt(lives, 0, LIVES.squire + 1) || !isInt(wins, 0, 200)) return null;
   if (!isInt(gold, 0, 999) || !isInt(rng, 0, 0xffffffff) || !isInt(nextUid, 1, 1_000_000)) return null;
   if (phase !== "shop" && phase !== "won" && phase !== "lost") return null;
   if (!Array.isArray(raw.team) || raw.team.length !== SLOTS) return null;
@@ -80,5 +80,19 @@ export function parseRun(text: string): Run | null {
     history.push({ round: h.round, outcome: h.outcome as "win" | "lose" | "draw", boss: h.boss });
   }
 
-  return { v: 1, seed, difficulty: d, round, attempt, lives, wins, gold, rng, nextUid, team, offers, relics, phase, history };
+  // boons: a short list of known, distinct ids; a pending choice is up to three more that are not held
+  const boons = raw.boons ?? []; // saves from before boons existed simply have none
+  if (!Array.isArray(boons) || boons.length > 4 || new Set(boons).size !== boons.length) return null;
+  if (!boons.every((b): b is string => typeof b === "string" && hasBoon(b))) return null;
+  let pendingBoons: string[] | null = null;
+  if (raw.pendingBoons !== null && raw.pendingBoons !== undefined) {
+    const p = raw.pendingBoons;
+    if (!Array.isArray(p) || p.length < 1 || p.length > 3 || new Set(p).size !== p.length) return null;
+    if (!p.every((b): b is string => typeof b === "string" && hasBoon(b) && !boons.includes(b))) return null;
+    pendingBoons = p;
+  }
+  const freeRolls = raw.freeRolls ?? 0;
+  if (!isInt(freeRolls, 0, 1)) return null;
+
+  return { v: 1, seed, difficulty: d, round, attempt, lives, wins, gold, rng, nextUid, team, offers, relics, phase, history, boons: boons as string[], pendingBoons, freeRolls };
 }

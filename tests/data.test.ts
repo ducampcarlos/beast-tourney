@@ -21,7 +21,7 @@ describe("content integrity", () => {
       expect(new Set(list.map((s) => s.tier)).size, `${f} tiers`).toBeGreaterThanOrEqual(5);
       expect(FACTION_DEFS[f].bonds[0].need).toBeLessThan(FACTION_DEFS[f].bonds[1].need);
     }
-    expect(SPECIES_LIST.length).toBeGreaterThanOrEqual(42);
+    expect(SPECIES_LIST.length).toBeGreaterThanOrEqual(55);
   });
 
   it("keeps shop creatures in tiers 1-5 with sane stats, and gives every one an ability", () => {
@@ -106,6 +106,6 @@ describe("ability text", () => {
     expect(describeAbility(species("wizard").ability!)).toBe("Battle start: Give 2 random allies +2 attack.");
     expect(describeAbility(species("mammoth").ability!, 1, "wildkin")).toBe("Battle start: Give all Wildkin +2/+2, then give itself a barrier.");
     expect(describeEffect({ kind: "revive", pct: 0.5 }, 1)).toBe("return once with 50% of its stats");
-    expect(describeAbility(species("lich").ability!, 2)).toBe("Ally faints: Summon a Pile of Bones (8/8).");
+    expect(describeAbility(species("lich").ability!, 2)).toBe("Ally faints: Summon a Pile of Bones (10/10).");
   });
 });

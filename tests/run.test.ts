@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BOSS_ROUNDS, MAX_ROUNDS, tierCap } from "../src/engine/enemy.js";
-import { BUY_COST, LIVES, ROLL_COST, START_GOLD, buy, buyRelic, fight, levelFor, move, newRun, offerCount, roll, sell, teamUnits, toggleFreeze, type Run } from "../src/engine/run.js";
+import { BUY_COST, LIVES, ROLL_COST, START_GOLD, buy, buyRelic, chooseBoon, fight, levelFor, move, newRun, offerCount, roll, sell, teamUnits, toggleFreeze, type Run } from "../src/engine/run.js";
 import { species } from "../src/engine/data.js";
 import { type Unit } from "../src/engine/types.js";
 import { setup } from "./helpers.js";
@@ -216,6 +216,7 @@ describe("fighting through the tournament", () => {
       if (!r.ok) throw new Error(r.error);
       rounds.push(run.round);
       run = r.run;
+      if (run.pendingBoons) run = must(chooseBoon(run, run.pendingBoons[0]!)).run; // the reward after a boss
     }
     expect(rounds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(run).toMatchObject({ phase: "won", wins: 12 });

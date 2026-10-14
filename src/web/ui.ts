@@ -166,3 +166,15 @@ export function overlay(scene: Phaser.Scene, title: string, lines: string[], onC
   scene.input.keyboard?.once("keydown-ESC", close);
   return close;
 }
+
+/** Change scene with a short fade, ignoring clicks while it plays. */
+export function go(scene: Phaser.Scene, key: string, data?: object): void {
+  if (!scene.input.enabled) return;
+  scene.input.enabled = false;
+  scene.cameras.main.fadeOut(160, 20, 16, 31);
+  scene.cameras.main.once("camerafadeoutcomplete", () => scene.scene.start(key, data));
+}
+
+export function fadeIn(scene: Phaser.Scene): void {
+  scene.cameras.main.fadeIn(220, 20, 16, 31);
+}

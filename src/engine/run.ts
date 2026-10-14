@@ -5,11 +5,11 @@
  */
 
 import { type BattleResult, type Outcome, simulateBattle } from "./battle.js";
-import { FACTION_DEFS, RELICS, SPECIES_LIST, relic as relicDef, species as speciesDef } from "./data.js";
-import { MAX_ROUNDS, enemyTeam, tierCap } from "./enemy.js";
+import { BOONS, FACTION_DEFS, RELICS, SPECIES_LIST, bondNeed, relic as relicDef, species as speciesDef } from "./data.js";
+import { BOSS_ROUNDS, MAX_ROUNDS, enemyTeam, tierCap } from "./enemy.js";
 import { Rng, hashSeed } from "./rng.js";
 import { selectAllies } from "./targets.js";
-import { type Ability, type Difficulty, type Effect, FACTIONS, LEVEL_EXP, MAX_LEVEL, SLOTS, type Trigger, type Unit } from "./types.js";
+import { type Ability, type Difficulty, type Effect, FACTIONS, LEVEL_EXP, MAX_LEVEL, type RelicDef, SLOTS, type Trigger, type Unit } from "./types.js";
 
 export const START_GOLD = 10;
 export const BUY_COST = 3;
@@ -48,18 +48,34 @@ export interface Run {
   relics: (RelicOffer | null)[];
   phase: "shop" | "won" | "lost";
   history: RoundRecord[];
+  /** Boons won so far. */
+  boons: string[];
+  /** Three boons to choose from, after a boss: nothing else can be done until one is taken. */
+  pendingBoons: string[] | null;
+  /** Rolls that cost nothing this turn. */
+  freeRolls: number;
 }
 
 export type ShopEvent =
   | { t: "gold"; amount: number }
   | { t: "buff"; uid: number; atk: number; hp: number }
   | { t: "merge"; uid: number }
-  | { t: "levelUp"; uid: number; level: number };
+  | { t: "levelUp"; uid: number; level: number }
+  | { t: "life" };
 
 export type Result = { ok: true; run: Run; events: ShopEvent[] } | { ok: false; error: string };
 
 const fail = (error: string): Result => ({ ok: false, error });
 const clone = (run: Run): Run => structuredClone(run);
+const holds = (run: Run, id: string): boolean => run.boons.includes(id);
+const blocked = (run: Run): Result | null => (run.phase !== "shop" ? fail("The run is over.") : run.pendingBoons ? fail("Choose your reward first.") : null);
+
+// What a boon changes in the shop, in one place so the UI shows the same numbers the rules use.
+export const offerSlots = (run: Run): number => Math.min(5, offerCount(run.round) + (holds(run, "market") ? 1 : 0));
+export const shopTier = (run: Run): number => Math.min(5, tierCap(run.round) + (holds(run, "scholar") ? 1 : 0));
+export const relicCost = (run: Run, def: RelicDef): number => Math.max(2, def.cost - (holds(run, "haggler") ? 1 : 0));
+export const rollCost = (run: Run): number => (run.freeRolls > 0 ? 0 : ROLL_COST);
+export const sellGold = (run: Run, unit: Unit): number => unit.level + (holds(run, "thrift") ? 1 : 0);
 
 export const offerCount = (round: number): number => (round <= 2 ? 3 : round <= 6 ? 4 : 5);
 export const relicOfferCount = (round: number): number => (round >= 2 ? 2 : 0);
@@ -74,6 +90,7 @@ export function newRun(seed: number, difficulty: Difficulty): Run {
   const run: Run = {
     v: 1, seed: seed >>> 0, difficulty, round: 1, attempt: 0, lives: LIVES[difficulty], wins: 0, gold: START_GOLD,
     rng: hashSeed(seed, 0x5eed), nextUid: 1, team: Array<Unit | null>(SLOTS).fill(null), offers: [], relics: [], phase: "shop", history: [],
+    boons: [], pendingBoons: null, freeRolls: 0,
   };
   beginTurn(run);
   return run;
@@ -81,8 +98,7 @@ export function newRun(seed: number, difficulty: Difficulty): Run {
 
 // ---- the shop ------------------------------------------------------------------------------
 
-function weightedSpecies(rng: Rng, round: number): string {
-  const cap = tierCap(round);
+function weightedSpecies(rng: Rng, cap: number): string {
   // The newest tier shows up most often, so progress is felt.
   const weights = Array.from({ length: cap }, (_, i) => (i + 1 === cap ? 3 : i + 2 === cap ? 2 : 1));
   const total = weights.reduce((a, b) => a + b, 0);
@@ -99,9 +115,10 @@ function weightedSpecies(rng: Rng, round: number): string {
 }
 
 function stock(run: Run, rng: Rng): void {
-  const n = offerCount(run.round);
+  const n = offerSlots(run);
+  const cap = shopTier(run);
   const offers: (Offer | null)[] = [];
-  for (let i = 0; i < n; i++) offers.push(run.offers[i]?.frozen ? run.offers[i]! : { sp: weightedSpecies(rng, run.round), frozen: false });
+  for (let i = 0; i < n; i++) offers.push(run.offers[i]?.frozen ? run.offers[i]! : { sp: weightedSpecies(rng, cap), frozen: false });
   run.offers = offers;
   const pool = RELICS.filter((r) => r.cost <= (run.round >= 6 ? 5 : 4));
   const m = relicOfferCount(run.round);
@@ -114,15 +131,26 @@ function turnEffects(run: Run): ShopEvent[] {
   const events: ShopEvent[] = [];
   for (const faction of FACTIONS) {
     const members = new Set(run.team.filter((u): u is Unit => u !== null && speciesDef(u.sp).faction === faction).map((u) => u.sp));
-    const tier = [...FACTION_DEFS[faction].bonds].reverse().find((b) => members.size >= b.need);
+    const tier = [...FACTION_DEFS[faction].bonds].reverse().find((b) => members.size >= bondNeed(b.need, run.boons));
     for (const effect of tier?.turn ?? []) applyShopEffect(run, null, effect, 1, events, faction);
   }
   for (const unit of run.team) if (unit) fireShop(run, unit, "turnStart", false, run.team.indexOf(unit), events);
+  if (holds(run, "mentor")) mentorBuff(run, events);
   return events;
 }
 
+/** Veteran's Banner: the weakest creature, front first on ties, gains +2/+2. */
+function mentorBuff(run: Run, events: ShopEvent[]): void {
+  const weakest = run.team.filter((u): u is Unit => u !== null).sort((a, b) => a.atk + a.hp - (b.atk + b.hp))[0];
+  if (!weakest) return;
+  weakest.atk += 2;
+  weakest.hp += 2;
+  events.push({ t: "buff", uid: weakest.uid, atk: 2, hp: 2 });
+}
+
 function beginTurn(run: Run): ShopEvent[] {
-  run.gold = START_GOLD;
+  run.gold = START_GOLD + (holds(run, "purse") ? 2 : 0);
+  run.freeRolls = holds(run, "lucky") ? 1 : 0;
   const events = turnEffects(run);
   stock(run, new Rng(run.rng));
   // stock() consumed numbers from a copy; advance the stored state deterministically
@@ -162,10 +190,13 @@ function fireShop(run: Run, unit: Unit, trigger: Trigger, gone: boolean, at: num
 // ---- commands ------------------------------------------------------------------------------
 
 export function roll(run: Run): Result {
-  if (run.phase !== "shop") return fail("The run is over.");
-  if (run.gold < ROLL_COST) return fail("Not enough gold to roll.");
+  const stop = blocked(run);
+  if (stop) return stop;
+  const cost = rollCost(run);
+  if (run.gold < cost) return fail("Not enough gold to roll.");
   const next = clone(run);
-  next.gold -= ROLL_COST;
+  if (cost === 0) next.freeRolls--;
+  else next.gold -= cost;
   const rng = new Rng(hashSeed(next.rng, next.gold, next.nextUid, 0x70));
   stock(next, rng);
   next.rng = hashSeed(next.rng, 0x71);
@@ -173,6 +204,8 @@ export function roll(run: Run): Result {
 }
 
 export function toggleFreeze(run: Run, kind: "creature" | "relic", index: number): Result {
+  const stop = blocked(run);
+  if (stop) return stop;
   const next = clone(run);
   const list = kind === "creature" ? next.offers : next.relics;
   const item = list[index];
@@ -196,7 +229,8 @@ function mergeInto(target: Unit, source: Unit, events: ShopEvent[]): void {
 }
 
 export function buy(run: Run, offerIndex: number, slot: number): Result {
-  if (run.phase !== "shop") return fail("The run is over.");
+  const stop = blocked(run);
+  if (stop) return stop;
   const offer = run.offers[offerIndex];
   if (!offer) return fail("That creature is no longer for sale.");
   if (slot < 0 || slot >= SLOTS) return fail("No such slot.");
@@ -215,15 +249,17 @@ export function buy(run: Run, offerIndex: number, slot: number): Result {
 }
 
 export function buyRelic(run: Run, relicIndex: number, slot: number): Result {
-  if (run.phase !== "shop") return fail("The run is over.");
+  const stop = blocked(run);
+  if (stop) return stop;
   const offer = run.relics[relicIndex];
   if (!offer) return fail("That relic is no longer for sale.");
   const unit = run.team[slot];
   if (!unit) return fail("Pick a creature to carry the relic.");
   const def = relicDef(offer.id);
-  if (run.gold < def.cost) return fail("Not enough gold.");
+  const price = relicCost(run, def);
+  if (run.gold < price) return fail("Not enough gold.");
   const next = clone(run);
-  next.gold -= def.cost;
+  next.gold -= price;
   next.relics[relicIndex] = null;
   next.team[slot]!.relic = def.id;
   return { ok: true, run: next, events: [] };
@@ -232,14 +268,16 @@ export function buyRelic(run: Run, relicIndex: number, slot: number): Result {
 export const sellValue = (unit: Unit): number => unit.level;
 
 export function sell(run: Run, slot: number): Result {
-  if (run.phase !== "shop") return fail("The run is over.");
+  const stop = blocked(run);
+  if (stop) return stop;
   const unit = run.team[slot];
   if (!unit) return fail("Nothing to sell there.");
   const next = clone(run);
   const sold = next.team[slot]!;
   const events: ShopEvent[] = [];
-  next.gold += sellValue(sold);
-  events.push({ t: "gold", amount: sellValue(sold) });
+  const earned = sellGold(next, sold);
+  next.gold += earned;
+  events.push({ t: "gold", amount: earned });
   fireShop(next, sold, "sell", true, slot, events);
   next.team[slot] = null;
   return { ok: true, run: next, events };
@@ -247,7 +285,8 @@ export function sell(run: Run, slot: number): Result {
 
 /** Drag a unit onto another slot: empty slots move it, creatures of the same species merge, others swap. */
 export function move(run: Run, from: number, to: number): Result {
-  if (run.phase !== "shop") return fail("The run is over.");
+  const stop = blocked(run);
+  if (stop) return stop;
   if (from === to) return { ok: true, run, events: [] };
   const a = run.team[from];
   if (!a || to < 0 || to >= SLOTS) return fail("Nothing to move.");
@@ -276,12 +315,13 @@ export function teamUnits(run: Run): Unit[] {
 export type FightResult = { ok: true; run: Run; battle: BattleResult; enemy: Unit[]; events: ShopEvent[] } | { ok: false; error: string };
 
 export function fight(run: Run): FightResult {
-  if (run.phase !== "shop") return { ok: false, error: "The run is over." };
+  const stop = blocked(run);
+  if (stop && !stop.ok) return { ok: false, error: stop.error };
   const mine = teamUnits(run);
   if (mine.length === 0) return { ok: false, error: "Field at least one creature." };
   const next = clone(run);
   const enemy = enemyTeam(next.seed, next.round, next.attempt, next.difficulty);
-  const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77));
+  const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons });
   const boss = next.round === MAX_ROUNDS || [4, 8].includes(next.round);
   next.history.push({ round: next.round, outcome: battle.outcome, boss });
 
@@ -295,7 +335,39 @@ export function fight(run: Run): FightResult {
   else if (finalRound) next.attempt++;
   else next.round++;
 
+  const wonBoss = battle.outcome === "win" && BOSS_ROUNDS.includes(run.round) && run.round < MAX_ROUNDS;
   let events: ShopEvent[] = [];
   if (next.phase === "shop") events = beginTurn(next);
+  if (wonBoss && next.phase === "shop") next.pendingBoons = offerBoons(next, run.round);
   return { ok: true, run: next, battle, enemy, events };
+}
+
+/** Three boons not held yet, drawn from the seed so the same run offers the same choice. */
+function offerBoons(run: Run, round: number): string[] {
+  const rng = new Rng(hashSeed(run.seed, round, 0xb00));
+  return rng.shuffle(BOONS.filter((b) => !holds(run, b.id)).map((b) => b.id)).slice(0, 3);
+}
+
+/** Take one of the offered boons. Effects that only matter once (a life, gold, a buff) land now; the rest apply from the next turn on. */
+export function chooseBoon(run: Run, id: string): Result {
+  if (run.phase !== "shop") return fail("The run is over.");
+  if (!run.pendingBoons?.includes(id)) return fail("That reward is not on offer.");
+  const next = clone(run);
+  next.pendingBoons = null;
+  next.boons.push(id);
+  const events: ShopEvent[] = [];
+  if (id === "purse") {
+    next.gold += 2;
+    events.push({ t: "gold", amount: 2 });
+  } else if (id === "second-wind") {
+    next.lives++;
+    events.push({ t: "life" });
+  } else if (id === "mentor") mentorBuff(next, events);
+  else if (id === "lucky") next.freeRolls = 1;
+  else if (id === "market" || id === "scholar") {
+    // the offers on the table were dealt under the old rules: deal them again, keeping what is frozen
+    stock(next, new Rng(hashSeed(next.rng, 0xb0)));
+    next.rng = hashSeed(next.rng, 0xb1);
+  }
+  return { ok: true, run: next, events };
 }

@@ -385,7 +385,7 @@ await test("shows the how-to-play panel once, on the first run, and never again"
   await page.waitForTimeout(700);
   assert.equal(await page.evaluate(() => window.__tourney.session.profile.seenHelp), true);
   // the panel sits on top: a click on the board does nothing until it is dismissed
-  await click(page, { x: 480, y: 480 }); // Got it
+  await click(page, { x: 480, y: 450 }); // Got it
   await page.waitForTimeout(200);
   await page.reload();
   await scene(page, "Menu");
@@ -398,24 +398,44 @@ await test("shows the how-to-play panel once, on the first run, and never again"
   await page.context().close();
 });
 
-await test("the menu has working How to play and Credits panels", async () => {
+await test("the menu has a working How to play panel", async () => {
   const page = await newPage();
   await click(page, { x: 380, y: 470 }); // How to play
-  await click(page, { x: 480, y: 480 }); // Got it
-  await click(page, { x: 580, y: 470 }); // Credits
-  await click(page, { x: 480, y: 480 });
+  await click(page, { x: 480, y: 450 }); // Got it
   await click(page, { x: 480, y: 322 }); // the menu is usable again
   await scene(page, "Shop");
   await page.context().close();
 });
 
-await test("remembers the sound setting", async () => {
+await test("settings: sound, volumes and battle speed are remembered after a reload", async () => {
   const page = await newPage();
-  await click(page, { x: 580, y: 424 }); // Sound toggle
-  assert.equal(await page.evaluate(() => window.__tourney.audio.muted), true);
+  await click(page, { x: 580, y: 470 }); // Settings
+  await click(page, { x: 530, y: 290 }); // Sound off
+  await click(page, { x: 400, y: 170 }); // music -
+  await click(page, { x: 400, y: 170 }); // music -
+  await click(page, { x: 400, y: 226 }); // effects -
+  await click(page, { x: 530, y: 346 }); // speed x2
+  await click(page, { x: 590, y: 420 }); // Done
+  const saved = await page.evaluate(() => ({ ...window.__tourney.session.profile }));
+  assert.equal(saved.muted, true);
+  assert.equal(saved.speed, 2);
+  assert.ok(Math.abs(saved.musicVolume - 0.3) < 0.001, `music ${saved.musicVolume}`);
+  assert.ok(Math.abs(saved.sfxVolume - 0.7) < 0.001, `effects ${saved.sfxVolume}`);
   await page.reload();
   await scene(page, "Menu");
-  assert.equal(await page.evaluate(() => window.__tourney.audio.muted), true);
+  const live = await page.evaluate(() => ({ muted: window.__tourney.audio.muted, music: window.__tourney.audio.musicVolume, sfx: window.__tourney.audio.sfxVolume }));
+  assert.deepEqual([live.muted, Math.round(live.music * 10), Math.round(live.sfx * 10)], [true, 3, 7]);
+  await page.context().close();
+});
+
+await test("the credits are reachable from the settings", async () => {
+  const page = await newPage();
+  await click(page, { x: 580, y: 470 }); // Settings
+  await click(page, { x: 370, y: 420 }); // Credits
+  await click(page, { x: 480, y: 450 }); // Got it
+  await click(page, { x: 590, y: 420 }); // Done
+  await click(page, { x: 480, y: 322 }); // the menu is usable again
+  await scene(page, "Shop");
   await page.context().close();
 });
 
@@ -428,7 +448,18 @@ await test("plays a whole tournament through the UI without a single error", asy
     await click(page, FIGHT);
     await finishBattle(page);
     await click(page, { x: 480, y: 392 });
-    if (round < 12) await scene(page, "Shop");
+    if (round === 4 || round === 8) {
+      await scene(page, "Boon"); // the reward for a boss
+      await click(page, { x: 480, y: 508 }); // Take the middle one
+    }
+    if (round < 12) {
+      try {
+        await scene(page, "Shop");
+      } catch (error) {
+        const where = await page.evaluate(() => ({ scenes: window.__tourney.game.scene.getScenes(true).map((x) => x.scene.key), run: window.__tourney.session.run && { round: window.__tourney.session.run.round, pending: window.__tourney.session.run.pendingBoons, boons: window.__tourney.session.run.boons } }));
+        throw new Error(`stuck after round ${round}: ${JSON.stringify(where)}`);
+      }
+    }
   }
   await scene(page, "End");
   assert.equal((await run(page)).phase, "won");
@@ -456,6 +487,92 @@ await test("works with a finger: double tap buys, tap selects", async () => {
   const r = await run(page);
   assert.equal(r.team.find((u) => u)?.sp, first);
   assert.equal(r.gold, 7);
+  await page.context().close();
+});
+
+await test("beating a boss offers three boons, and taking one keeps it for the run", async () => {
+  const page = await newPage();
+  await startRun(page, 6);
+  const giants = Array.from({ length: 5 }, (_, i) => unit(i + 1, "mammoth", 90, 900));
+  await inject(page, { round: 4, team: giants, nextUid: 20 });
+  await click(page, FIGHT);
+  await finishBattle(page);
+  await click(page, { x: 480, y: 392 });
+  await scene(page, "Boon");
+  const offered = (await run(page)).pendingBoons;
+  assert.equal(offered.length, 3);
+  await click(page, { x: 770, y: 508 }); // the third
+  await scene(page, "Shop");
+  const r = await run(page);
+  assert.deepEqual(r.boons, [offered[2]]);
+  assert.equal(r.pendingBoons, null);
+  assert.equal(r.round, 5);
+  await page.context().close();
+});
+
+await test("a boon waiting to be chosen cannot be skipped by reloading the page", async () => {
+  const page = await newPage();
+  await startRun(page, 6);
+  const giants = Array.from({ length: 5 }, (_, i) => unit(i + 1, "mammoth", 90, 900));
+  await inject(page, { round: 4, team: giants, nextUid: 20 });
+  await click(page, FIGHT);
+  await finishBattle(page);
+  await click(page, { x: 480, y: 392 });
+  await scene(page, "Boon");
+  await page.reload();
+  await scene(page, "Menu");
+  await click(page, { x: 480, y: 376 }); // Continue
+  await scene(page, "Boon");
+  await page.context().close();
+});
+
+await test("undo takes back the last move of the turn, with the button and with Z", async () => {
+  const page = await newPage();
+  await startRun(page);
+  const start = await run(page);
+  await drag(page, cardXY(0), slotXY(0));
+  assert.equal((await run(page)).gold, 7);
+  await click(page, { x: 262, y: 514 }); // Undo
+  assert.deepEqual(await run(page), start);
+  await drag(page, cardXY(0), slotXY(0));
+  await drag(page, cardXY(1), slotXY(1));
+  await page.keyboard.press("z");
+  await page.waitForTimeout(250);
+  const r = await run(page);
+  assert.equal(r.gold, 7);
+  assert.equal(r.team[1], null);
+  assert.ok(r.team[0]);
+  await page.context().close();
+});
+
+await test("Lucky Charm makes the first roll of a turn free", async () => {
+  const page = await newPage();
+  await startRun(page);
+  await inject(page, { boons: ["lucky"], freeRolls: 1, gold: 10 });
+  await click(page, ROLL);
+  assert.equal((await run(page)).gold, 10);
+  await click(page, ROLL);
+  assert.equal((await run(page)).gold, 9);
+  await page.context().close();
+});
+
+await test("trophies are earned in play, saved, and listed", async () => {
+  const page = await newPage();
+  await startRun(page);
+  await inject(page, { team: team(unit(1, "mammoth", 20, 60)), nextUid: 10 });
+  await click(page, FIGHT);
+  await finishBattle(page);
+  await click(page, { x: 480, y: 392 });
+  await scene(page, "Shop");
+  const owned = await page.evaluate(() => window.__tourney.session.profile.trophies);
+  assert.ok(owned.includes("first-blood"), `trophies: ${owned}`);
+  await page.reload();
+  await scene(page, "Menu");
+  await click(page, { x: 580, y: 424 }); // Trophies
+  await scene(page, "Trophies");
+  assert.ok((await page.evaluate(() => window.__tourney.session.profile.trophies)).includes("first-blood"));
+  await click(page, { x: 880, y: 27 }); // Back
+  await scene(page, "Menu");
   await page.context().close();
 });
 

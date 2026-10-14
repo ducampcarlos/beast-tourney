@@ -7,7 +7,8 @@ import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import { burst } from "./fx.js";
 import type { Session } from "./session.js";
-import { COLOR, H, W, backdrop, button, panel, text, type Button } from "./ui.js";
+import { flushTrophies } from "./toasts.js";
+import { COLOR, H, W, backdrop, button, fadeIn, go, panel, text, type Button } from "./ui.js";
 
 export class End extends Phaser.Scene {
   private run!: Run;
@@ -26,7 +27,9 @@ export class End extends Phaser.Scene {
     const run = this.run;
     const won = run.phase === "won";
     audio.music(won ? "victory" : "defeat", false);
+    fadeIn(this);
     backdrop(this, 1.5);
+    flushTrophies(this);
 
     panel(this, W / 2 - 330, 40, 660, 456, "ui_ancient_brown");
     const title = text(this, W / 2, 100, won ? "CHAMPION!" : "ELIMINATED", 70, won ? COLOR.gold : COLOR.red, { stroke: "#2a1f1a", strokeThickness: 12 }).setOrigin(0.5);
@@ -52,13 +55,13 @@ export class End extends Phaser.Scene {
 
     button(this, W / 2 - 150, 450, "New Run", () => {
       session.start(run.difficulty);
-      this.scene.start("Shop");
+      go(this, "Shop");
     }, { w: 200, h: 50, color: "green", size: 26 });
     const share = button(this, W / 2 + 60, 450, "Copy result", () => {
       const summary = `Beast Tourney - ${run.difficulty}, seed ${run.seed}: ${won ? "champion" : `out in round ${run.round}`} (${wins} rounds won)`;
       void navigator.clipboard?.writeText(summary).then(() => share.setLabel("Copied!"), () => share.setLabel("Copy failed"));
     }, { w: 200, h: 50, color: "blue", size: 24 }) as Button;
-    button(this, W / 2 + 230, 450, "Menu", () => this.scene.start("Menu"), { w: 110, h: 50, color: "grey", size: 22 });
+    button(this, W / 2 + 230, 450, "Menu", () => go(this, "Menu"), { w: 110, h: 50, color: "grey", size: 22 });
 
     if (won) for (let i = 0; i < 8; i++) this.time.delayedCall(i * 220, () => burst(this, 120 + Math.random() * 720, 120 + Math.random() * 220, "fx_star_01", 18, [0xffe27a, 0xff9d6b, 0x9dd8ff][i % 3]!, 260, 50));
     (window as unknown as { __tourney?: Record<string, unknown> }).__tourney && ((window as unknown as { __tourney: Record<string, unknown> }).__tourney.end = { run });

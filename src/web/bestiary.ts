@@ -5,7 +5,8 @@ import { describeAbility } from "../engine/text.js";
 import { FACTIONS } from "../engine/types.js";
 import type { Audio } from "./audio.js";
 import type { Session } from "./session.js";
-import { COLOR, H, W, backdrop, button, panel, text } from "./ui.js";
+import { COLOR, H, W, backdrop, button, fadeIn, go, lighten, panel, text } from "./ui.js";
+import { flushTrophies } from "./toasts.js";
 
 const CELL = 62;
 const GRID_X = 168;
@@ -21,19 +22,23 @@ export class Bestiary extends Phaser.Scene {
 
   create(): void {
     this.session = this.registry.get("session") as Session;
+    this.detail = [];
     (this.registry.get("audio") as Audio).music("menu");
+    fadeIn(this);
     backdrop(this, 1.2);
     panel(this, 0, 0, W, 54, "ui_ancient_brown");
     text(this, 18, 26, "Bestiary", 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
     const seen = SPECIES_LIST.filter((s) => this.session.profile.seen.includes(s.id)).length;
     text(this, 190, 27, `${seen} of ${SPECIES_LIST.length} met`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5);
-    button(this, 880, 27, "Back", () => this.scene.start("Menu"), { w: 130, h: 40, color: "grey", size: 20 });
+    button(this, 880, 27, "Back", () => go(this, "Menu"), { w: 130, h: 40, color: "grey", size: 20 });
 
     panel(this, 12, 64, 630, 464, "ui_ancient_brown");
     FACTIONS.forEach((f, row) => {
       const def = FACTION_DEFS[f];
       const y = GRID_Y + row * 60;
-      text(this, 28, y, def.name, 20, "#" + def.color.toString(16).padStart(6, "0"), { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5);
+      const label = text(this, 28, y, def.name, 20, lighten(def.color, 0.5), { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
+      label.on("pointerover", () => this.showFaction(f));
+      label.on("pointerup", () => this.showFaction(f));
       SPECIES_LIST.filter((s) => s.faction === f).forEach((s, col) => {
         const x = GRID_X + col * CELL;
         const known = this.session.profile.seen.includes(s.id);
@@ -48,6 +53,36 @@ export class Bestiary extends Phaser.Scene {
 
     panel(this, 650, 64, 298, 464, "ui_ancient_brown");
     this.show(SPECIES_LIST[0]!.id, this.session.profile.seen.includes(SPECIES_LIST[0]!.id));
+    flushTrophies(this);
+  }
+
+  /** Hovering a faction name shows what it is about and what its bonds do. */
+  private showFaction(f: (typeof FACTIONS)[number]): void {
+    for (const o of this.detail) o.destroy();
+    this.detail = [];
+    const def = FACTION_DEFS[f];
+    const x = 666;
+    let y = 80;
+    const add = (o: Phaser.GameObjects.GameObject) => this.detail.push(o);
+    add(text(this, x, y, def.name, 30, lighten(def.color, 0.5), { stroke: "#2a1f1a", strokeThickness: 5 }));
+    y += 44;
+    const blurb = text(this, x, y, def.blurb, 18, COLOR.cream, { wordWrap: { width: 266 } });
+    add(blurb);
+    y += blurb.height + 18;
+    for (const b of def.bonds) {
+      add(text(this, x, y, `${b.need} different creatures`, 18, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 3 }));
+      y += 26;
+      const t = text(this, x, y, b.text, 17, COLOR.cream, { wordWrap: { width: 266 } });
+      add(t);
+      y += t.height + 16;
+    }
+    const members = SPECIES_LIST.filter((s) => s.faction === f);
+    members.forEach((m, i) => {
+      const known = this.session.profile.seen.includes(m.id);
+      const sp = this.add.sprite(x + 20 + (i % 6) * 44, y + 24 + Math.floor(i / 6) * 44, "creatures", m.frames[0]).setScale(2.4);
+      if (!known) sp.setTintFill(0x1a1410).setAlpha(0.9);
+      add(sp);
+    });
   }
 
   private show(id: string, known: boolean): void {
