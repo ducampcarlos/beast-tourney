@@ -167,6 +167,18 @@ export function overlay(scene: Phaser.Scene, title: string, lines: string[], onC
   return close;
 }
 
+/** A question with two answers, above everything else. `onYes` runs only if it is confirmed. */
+export function confirmBox(scene: Phaser.Scene, message: string, yes: string, no: string, onYes: () => void, depth = 5000): void {
+  const objects: Phaser.GameObjects.GameObject[] = [];
+  const close = () => objects.forEach((o) => o.destroy());
+  const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setDepth(depth).setInteractive();
+  const box = panel(scene, W / 2 - 300, H / 2 - 110, 600, 220, "ui_ancient_brown").setDepth(depth + 1);
+  const body = text(scene, W / 2, H / 2 - 50, message, 20, COLOR.cream, { align: "center", wordWrap: { width: 540 }, lineSpacing: 4, stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0.5).setDepth(depth + 2);
+  const a = button(scene, W / 2 - 120, H / 2 + 62, yes, () => (close(), onYes()), { w: 190, h: 46, color: "green", size: 22 }).setDepth(depth + 2);
+  const b = button(scene, W / 2 + 120, H / 2 + 62, no, close, { w: 190, h: 46, color: "grey", size: 22 }).setDepth(depth + 2);
+  objects.push(dim, box, body, a, b);
+}
+
 /** Change scene with a short fade, ignoring clicks while it plays. */
 export function go(scene: Phaser.Scene, key: string, data?: object): void {
   if (!scene.input.enabled) return;

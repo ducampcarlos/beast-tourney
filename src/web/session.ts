@@ -8,6 +8,7 @@ import { type Run, newRun } from "../engine/run.js";
 import { parseRun, serializeRun } from "../engine/save.js";
 import { DIFFICULTIES, type Difficulty } from "../engine/types.js";
 import { hasSpecies } from "../engine/data.js";
+import { store } from "./storage.js";
 import { hasTrophy, pointsEarned } from "../engine/achievements.js";
 import { type Buy, buySkill, totalCost, validTree } from "../engine/skills.js";
 
@@ -69,21 +70,8 @@ const emptyProfile = (): Profile => ({
   records: [],
 });
 
-function read(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function write(key: string, value: string | null): void {
-  try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, value);
-  } catch {
-    /* storage blocked or full: carry on without saving */
-  }
-}
+const read = (key: string): string | null => store.get(key);
+const write = (key: string, value: string | null): void => store.set(key, value);
 
 function validRecord(raw: unknown): RunRecord | null {
   if (typeof raw !== "object" || raw === null) return null;
@@ -195,6 +183,15 @@ export class Session {
       this.saveProfile();
     }
     return fresh;
+  }
+
+  /** Put an imported save in place of everything: the profile and the run in progress. */
+  restore(profile: Profile, run: Run | null): void {
+    this.profile = profile;
+    this.run = run;
+    this.saveProfile();
+    if (run) write(RUN_KEY, serializeRun(run));
+    else write(RUN_KEY, null);
   }
 
   /** Skill points not spent yet. */

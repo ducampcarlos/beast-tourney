@@ -485,6 +485,63 @@ await test("challenges give points that buy skills in the tree, and the skills s
   await page.context().close();
 });
 
+await test("the save can be exported to a file and imported again, and a bad file changes nothing", async () => {
+  const page = await newPage();
+  await page.evaluate(() => {
+    const { session } = window.__tourney;
+    session.profile.trophies = ["first-blood", "fully-grown"];
+    session.profile.runs = 3;
+    session.saveProfile();
+    session.start("knight", 7);
+  });
+  await page.reload();
+  await scene(page, "Menu");
+  await click(page, { x: 580, y: 470 }); // Settings
+  const [download] = await Promise.all([page.waitForEvent("download"), click(page, { x: 492, y: 340 })]); // Export
+  assert.match(download.suggestedFilename(), /^beast-tourney-save-\d{4}-\d{2}-\d{2}\.json$/);
+  const text = await readFile(await download.path(), "utf8");
+  const file = JSON.parse(text);
+  assert.equal(file.game, "beast-tourney");
+  assert.deepEqual(file.profile.trophies, ["first-blood", "fully-grown"]);
+  assert.equal(file.run.seed, 7);
+  // it is also kept in the tab's own storage, besides the persistent one
+  assert.ok(await page.evaluate(() => sessionStorage.getItem("beast-tourney.profile.v1") !== null));
+
+  // wipe everything, as a new browser would be
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+  await page.reload();
+  await scene(page, "Menu");
+  const progress = () => page.evaluate(() => ({ trophies: window.__tourney.session.profile.trophies, seed: window.__tourney.session.run?.seed ?? null }));
+  assert.deepEqual(await progress(), { trophies: [], seed: null });
+  // a standing listener, so the browser is already intercepting file dialogs when the button is pressed
+  let wanted = null;
+  page.on("filechooser", (c) => wanted?.(c));
+  const choose = async (buffer) => {
+    const next = new Promise((resolve) => (wanted = resolve));
+    await click(page, { x: 642, y: 340 }); // Import
+    const chooser = await next;
+    await chooser.setFiles({ name: "save.json", mimeType: "application/json", buffer: Buffer.from(buffer) });
+    await page.waitForTimeout(400);
+  };
+  await click(page, { x: 580, y: 470 }); // Settings
+  // not a save: nothing happens
+  await choose("this is not json");
+  await choose(JSON.stringify({ game: "something-else", format: 1, profile: {} }));
+  assert.deepEqual(await progress(), { trophies: [], seed: null });
+  // a real save, but the player keeps what they have
+  await choose(text);
+  await click(page, { x: 600, y: 332 }); // Keep mine
+  await page.waitForTimeout(200);
+  assert.deepEqual(await progress(), { trophies: [], seed: null });
+  // and now replace it
+  await choose(text);
+  await Promise.all([page.waitForEvent("load"), click(page, { x: 360, y: 332 })]); // Replace: the page reloads
+  await scene(page, "Menu");
+  assert.deepEqual(await progress(), { trophies: ["first-blood", "fully-grown"], seed: 7 });
+  assert.equal(await page.evaluate(() => window.__tourney.session.profile.runs), 4); // 3, and the run that was started
+  await page.context().close();
+});
+
 await test("continues a saved run after a reload", async () => {
   const page = await newPage("?debug&nohelp&seed=21");
   await click(page, { x: 480, y: 322 });
@@ -556,13 +613,13 @@ await test("the menu has a working How to play panel", async () => {
 await test("settings: sound, volumes and battle speed are remembered after a reload", async () => {
   const page = await newPage();
   await click(page, { x: 580, y: 470 }); // Settings
-  await click(page, { x: 530, y: 262 }); // Sound off
-  await click(page, { x: 530, y: 310 }); // Screen shake off
-  await click(page, { x: 400, y: 166 }); // music -
-  await click(page, { x: 400, y: 166 }); // music -
-  await click(page, { x: 400, y: 214 }); // effects -
-  await click(page, { x: 530, y: 358 }); // speed x2
-  await click(page, { x: 590, y: 420 }); // Done
+  await click(page, { x: 530, y: 196 }); // Sound off
+  await click(page, { x: 530, y: 238 }); // Screen shake off
+  await click(page, { x: 400, y: 112 }); // music -
+  await click(page, { x: 400, y: 112 }); // music -
+  await click(page, { x: 400, y: 154 }); // effects -
+  await click(page, { x: 530, y: 280 }); // speed x2
+  await click(page, { x: 590, y: 466 }); // Done
   const saved = await page.evaluate(() => ({ ...window.__tourney.session.profile }));
   assert.equal(saved.muted, true);
   assert.equal(saved.shake, false);
@@ -579,18 +636,18 @@ await test("settings: sound, volumes and battle speed are remembered after a rel
 await test("the credits are reachable from the settings", async () => {
   const page = await newPage();
   await click(page, { x: 580, y: 470 }); // Settings
-  await click(page, { x: 370, y: 420 }); // Credits
+  await click(page, { x: 370, y: 466 }); // Credits
   const open = (label) => page.evaluate((l) => window.__tourney.game.scene.getScenes(true)[0].children.list.some((c) => c.text === l), label);
   // the credits sit above the settings: a click on the Done button underneath does nothing
-  await click(page, { x: 640, y: 424 });
+  await click(page, { x: 640, y: 466 });
   assert.ok((await open("Credits")) && (await open("Settings")));
   // and Escape closes the credits only, then the settings
   await page.keyboard.press("Escape");
   await page.waitForTimeout(150);
   assert.ok(!(await open("Credits")) && (await open("Settings")));
-  await click(page, { x: 370, y: 420 }); // Credits again
+  await click(page, { x: 370, y: 466 }); // Credits again
   await click(page, { x: 480, y: 450 }); // Got it
-  await click(page, { x: 590, y: 420 }); // Done
+  await click(page, { x: 590, y: 466 }); // Done
   await click(page, { x: 480, y: 322 }); // the menu is usable again
   await scene(page, "Shop");
   await page.context().close();
