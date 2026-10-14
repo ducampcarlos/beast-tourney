@@ -28,7 +28,7 @@ export class Skills extends Phaser.Scene {
     fadeIn(this);
     backdrop(this, 1.2);
     panel(this, 0, 0, W, 54, "ui_ancient_brown");
-    text(this, 18, 26, t("Skill Tree"), 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
+    text(this, 18, 26, t("Skill Tree"), t("Skill Tree").length > 14 ? 24 : 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
     button(this, 700, 27, t("Respec"), () => this.respec(), { w: 130, h: 40, color: "yellow", size: 20 });
     button(this, 880, 27, t("Back"), () => go(this, "Menu"), { w: 130, h: 40, color: "grey", size: 20 });
     panel(this, 12, 64, W - 24, 464, "ui_ancient_brown");
@@ -54,8 +54,8 @@ export class Skills extends Phaser.Scene {
     const owned = this.session.profile.skills;
     const earned = pointsEarned(this.session.profile.trophies);
     const left = this.session.points();
-    this.keep(text(this, 190, 22, tn(left, "{n} point to spend", "{n} points to spend"), 22, left > 0 ? COLOR.gold : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
-    this.keep(text(this, 190, 42, t("{n} earned from challenges", { n: earned }), 12, COLOR.muted).setOrigin(0, 0.5));
+    this.keep(text(this, 380, 22, tn(left, "{n} point to spend", "{n} points to spend"), 22, left > 0 ? COLOR.gold : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
+    this.keep(text(this, 380, 42, t("{n} earned from challenges", { n: earned }), 12, COLOR.muted).setOrigin(0, 0.5));
 
     BRANCHES.forEach((branch, col) => {
       const x = 22 + col * (COL_W + 12);

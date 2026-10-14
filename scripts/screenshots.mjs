@@ -2,6 +2,7 @@
 // through the debug hook. Run `npm run build` first.
 //
 //   CHROME_PATH=/path/to/chromium node scripts/screenshots.mjs
+//   LOCALE=es-AR OUT_DIR=/tmp/shots-es node scripts/screenshots.mjs     the same, in another language, somewhere else
 
 import { createServer } from "node:http";
 import { mkdir, readFile } from "node:fs/promises";
@@ -12,7 +13,8 @@ import { chromium } from "playwright-core";
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const docs = join(root, "docs");
-const out = join(root, "assets");
+const out = process.env.OUT_DIR || join(root, "assets");
+const locale = process.env.LOCALE || "en-US";
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".svg": "image/svg+xml", ".png": "image/png", ".ogg": "audio/ogg", ".ttf": "font/ttf" };
 
 const server = createServer(async (req, res) => {
@@ -32,7 +34,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH 
 const unit = (uid, sp, atk, hp, level = 1, exp = 0, relic) => ({ uid, sp, atk, hp, level, exp, ...(relic ? { relic } : {}) });
 
 async function open(query = "?debug&nohelp") {
-  const context = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 2 });
+  const context = await browser.newContext({ viewport: { width: 960, height: 540 }, deviceScaleFactor: 2, locale });
   const page = await context.newPage();
   await page.goto(base + query);
   await page.waitForFunction(() => window.__tourney?.game?.scene?.isActive("Menu"));
@@ -41,7 +43,7 @@ async function open(query = "?debug&nohelp") {
 }
 const shot = async (page, name) => {
   await page.screenshot({ path: join(out, `${name}.png`) });
-  console.log(`wrote assets/${name}.png`);
+  console.log(`wrote ${name}.png`);
 };
 const setRun = (page, patch, difficulty = "knight", seed = 31) =>
   page.evaluate(({ patch, difficulty, seed }) => {

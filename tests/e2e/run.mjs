@@ -542,6 +542,74 @@ await test("the save can be exported to a file and imported again, and a bad fil
   await page.context().close();
 });
 
+// every text object of the scenes that are up, including those inside containers (buttons)
+const texts = (page) =>
+  page.evaluate(() => {
+    const out = [];
+    const walk = (list) => list.forEach((o) => { if (typeof o.text === "string") out.push(o.text); if (o.list) walk(o.list); });
+    window.__tourney.game.scene.getScenes(true).forEach((sc) => walk(sc.children.list));
+    return out;
+  });
+
+await test("the language follows the browser, can be changed in the settings, and is remembered", async () => {
+  // a Portuguese browser gets Portuguese, a French one (a language the game does not speak) gets English
+  const pt = await newPage("?debug&nohelp", { locale: "pt-BR" });
+  assert.equal(await pt.evaluate(() => document.documentElement.lang), "pt");
+  let words = await texts(pt);
+  assert.ok(!words.includes("New Run") && !words.includes("Settings"), `still English: ${words.join(" | ")}`);
+  await pt.context().close();
+  const fr = await newPage("?debug&nohelp", { locale: "fr-FR" });
+  assert.equal(await fr.evaluate(() => document.documentElement.lang), "en");
+  assert.ok((await texts(fr)).includes("New Run"));
+  await fr.context().close();
+
+  // the Language button cycles English -> Spanish -> Portuguese -> English, and the menu is drawn again each time
+  const page = await newPage();
+  const lang = () => page.evaluate(() => ({ profile: window.__tourney.session.profile.lang, html: document.documentElement.lang }));
+  assert.deepEqual(await lang(), { profile: null, html: "en" });
+  await click(page, { x: 580, y: 470 }); // Settings
+  await click(page, { x: 530, y: 322 }); // Language
+  await page.waitForTimeout(300);
+  assert.deepEqual(await lang(), { profile: "es", html: "es" });
+  words = await texts(page);
+  assert.ok(!words.includes("New Run") && !words.includes("Settings") && !words.includes("Daily Run"), `still English: ${words.join(" | ")}`);
+  await page.reload();
+  await scene(page, "Menu");
+  assert.deepEqual(await lang(), { profile: "es", html: "es" }); // remembered
+  assert.ok(!(await texts(page)).includes("New Run"));
+  // back to English by cycling through Portuguese
+  await click(page, { x: 580, y: 470 });
+  await click(page, { x: 530, y: 322 });
+  await page.waitForTimeout(300);
+  assert.equal((await lang()).profile, "pt");
+  await click(page, { x: 580, y: 470 });
+  await click(page, { x: 530, y: 322 });
+  await page.waitForTimeout(300);
+  assert.equal((await lang()).profile, "en");
+  assert.ok((await texts(page)).includes("New Run"));
+  await page.context().close();
+});
+
+await test("a whole run can be played in Spanish and in Portuguese without an English word slipping through", async () => {
+  for (const locale of ["es-AR", "pt-BR"]) {
+    const page = await newPage("?debug&nohelp&seed=12", { locale });
+    await click(page, { x: 418, y: 322 }); // New Run
+    await scene(page, "Shop");
+    await page.waitForTimeout(300);
+    await drag(page, cardXY(0), slotXY(0));
+    const english = /\b(Roll|Undo|FIGHT|Creatures for sale|Next opponent|Relics|Bonds|Round|Drag creatures|Attack|Health)\b/;
+    const inShop = (await texts(page)).filter((w) => english.test(w));
+    assert.deepEqual(inShop, [], `${locale} shop`);
+    await page.mouse.move(slotXY(0).x, slotXY(0).y);
+    await page.waitForTimeout(250);
+    assert.deepEqual((await texts(page)).filter((w) => /\b(Attack|Health|Battle start|Hurt|Faint)\b/.test(w)), [], `${locale} info panel`);
+    await click(page, FIGHT);
+    await finishBattle(page);
+    assert.deepEqual((await texts(page)).filter((w) => /\b(VICTORY|DEFEAT|DRAW|Continue|cleared|Defeated|You lose)\b/.test(w)), [], `${locale} result`);
+    await page.context().close();
+  }
+});
+
 await test("continues a saved run after a reload", async () => {
   const page = await newPage("?debug&nohelp&seed=21");
   await click(page, { x: 480, y: 322 });
