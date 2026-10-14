@@ -13,6 +13,22 @@ import { hasTrophy } from "../engine/achievements.js";
 const RUN_KEY = "beast-tourney.run.v1";
 const PROFILE_KEY = "beast-tourney.profile.v1";
 
+export interface RunRecord {
+  /** When it ended, in milliseconds since 1970. */
+  t: number;
+  difficulty: Difficulty;
+  seed: number;
+  outcome: "won" | "lost";
+  /** The round reached (the one it was won or lost in). */
+  round: number;
+  endless: boolean;
+  wins: number;
+  /** The creatures it ended with, front first. */
+  team: string[];
+}
+
+export const MAX_RECORDS = 12;
+
 export interface Profile {
   /** Species the player has met, in the shop or across the battlefield. */
   seen: string[];
@@ -28,6 +44,8 @@ export interface Profile {
   runs: number;
   seenHelp: boolean;
   trophies: string[];
+  /** The most recent runs, newest first. */
+  records: RunRecord[];
 }
 
 const emptyProfile = (): Profile => ({
@@ -41,6 +59,7 @@ const emptyProfile = (): Profile => ({
   runs: 0,
   seenHelp: false,
   trophies: [],
+  records: [],
 });
 
 function read(key: string): string | null {
@@ -57,6 +76,18 @@ function write(key: string, value: string | null): void {
   } catch {
     /* storage blocked or full: carry on without saving */
   }
+}
+
+function validRecord(raw: unknown): RunRecord | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const int = (v: unknown, min: number, max: number): v is number => typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
+  if (!int(r.t, 0, 8.64e15) || !int(r.seed, 0, 0xffffffff) || !int(r.round, 1, 99) || !int(r.wins, 0, 200)) return null;
+  if (typeof r.difficulty !== "string" || !(DIFFICULTIES as readonly string[]).includes(r.difficulty)) return null;
+  if (r.outcome !== "won" && r.outcome !== "lost") return null;
+  if (typeof r.endless !== "boolean") return null;
+  if (!Array.isArray(r.team) || r.team.length > 5 || !r.team.every((s): s is string => typeof s === "string" && hasSpecies(s))) return null;
+  return { t: r.t, difficulty: r.difficulty as Difficulty, seed: r.seed, outcome: r.outcome, round: r.round, endless: r.endless, wins: r.wins, team: r.team };
 }
 
 export function parseProfile(text: string | null): Profile {
@@ -80,6 +111,7 @@ export function parseProfile(text: string | null): Profile {
     if (typeof raw.seenHelp === "boolean") base.seenHelp = raw.seenHelp;
     if (typeof raw.sfxVolume === "number" && raw.sfxVolume >= 0 && raw.sfxVolume <= 1) base.sfxVolume = raw.sfxVolume;
     if (raw.speed === 1 || raw.speed === 2 || raw.speed === 4) base.speed = raw.speed;
+    if (Array.isArray(raw.records)) base.records = raw.records.map(validRecord).filter((r): r is RunRecord => r !== null).slice(0, MAX_RECORDS);
     if (Array.isArray(raw.trophies)) base.trophies = [...new Set(raw.trophies.filter((t): t is string => typeof t === "string" && hasTrophy(t)))];
     return base;
   } catch {
@@ -130,6 +162,17 @@ export class Session {
       const reached = run.phase === "won" ? 12 : run.round;
       this.profile.best[run.difficulty] = { round: Math.max(best.round, reached), wins: best.wins + (run.phase === "won" ? 1 : 0) };
     }
+    this.profile.records.unshift({
+      t: Date.now(),
+      difficulty: run.difficulty,
+      seed: run.seed,
+      outcome: run.phase === "won" ? "won" : "lost",
+      round: run.round,
+      endless: run.endless,
+      wins: run.history.filter((h) => h.outcome === "win").length,
+      team: run.team.filter((u): u is NonNullable<typeof u> => u !== null).map((u) => u.sp),
+    });
+    this.profile.records.length = Math.min(this.profile.records.length, MAX_RECORDS);
     write(RUN_KEY, null);
     this.saveProfile();
   }

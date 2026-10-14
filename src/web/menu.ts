@@ -1,7 +1,6 @@
 import Phaser from "phaser";
 
 import { SPECIES_LIST } from "../engine/data.js";
-import { LIVES } from "../engine/run.js";
 import { DIFFICULTIES, type Difficulty } from "../engine/types.js";
 import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
@@ -83,7 +82,7 @@ export class Menu extends Phaser.Scene {
     this.registry.set("difficulty", d);
     const session = this.registry.get("session") as Session;
     for (const [key, b] of this.pickButtons) b.setAlpha(key === d ? 1 : 0.55);
-    this.blurb.setText(`${BLURB[d]}\n${LIVES[d]} lives`);
+    this.blurb.setText(BLURB[d]);
     const best = session.profile.best[d];
     this.recordText.setText(best.round > 0 ? `Best ${d}: round ${best.round}/12${best.wins > 0 ? `, ${best.wins} tournament${best.wins > 1 ? "s" : ""} won` : ""}` : `No ${d} record yet`);
     if (sound) (this.registry.get("audio") as Audio).sfx("select", 0.4);

@@ -63,10 +63,10 @@ const go = (page, key, data) => page.evaluate(({ key, data }) => window.__tourne
 {
   const { page, context } = await open();
   await setRun(page, {
-    round: 7, gold: 8, wins: 5, lives: 3, nextUid: 50,
-    team: [unit(1, "wolf", 5, 6, 2, 2, "whetstone"), unit(2, "boar", 4, 5), unit(3, "bear", 4, 7, 1, 1), unit(4, "tiger", 6, 7), unit(5, "eagle", 5, 6)],
-    offers: [{ sp: "mammoth", frozen: false }, { sp: "squirrel", frozen: true }, { sp: "bear", frozen: false }, { sp: "lich", frozen: false }, { sp: "fairy", frozen: false }],
-    relics: [{ id: "phoenix-tear", frozen: false }, { id: "rally-blade", frozen: false }],
+    round: 9, gold: 12, wins: 7, lives: 4, nextUid: 50, boons: ["purse", "bulwark"],
+    team: [unit(1, "wolf", 7, 8, 2, 2, "great-hammer"), unit(2, "stag", 6, 8), unit(3, "bear", 5, 9, 2, 2), unit(4, "tiger", 8, 9), unit(5, "eagle", 6, 7)],
+    offers: [{ sp: "gorgon", frozen: false }, { sp: "cyclops", frozen: true }, { sp: "reaper", frozen: false }, { sp: "maneater", frozen: false }, { sp: "gargoyle", frozen: false }],
+    relics: [{ id: "merchant-ring", frozen: false }, { id: "rally-blade", frozen: false }],
   });
   await go(page, "Shop");
   await page.waitForTimeout(900);
@@ -74,6 +74,36 @@ const go = (page, key, data) => page.evaluate(({ key, data }) => window.__tourne
   await page.waitForTimeout(400);
   await shot(page, "shop");
   await page.evaluate(() => window.__tourney.game.scene.getScene("Shop").setHover({ kind: "unit", slot: 4 }));
+  await context.close();
+}
+
+// the reward after a boss
+{
+  const { page, context } = await open();
+  await setRun(page, { round: 5, nextUid: 50, boons: ["tonic"], pendingBoons: ["lucky", "scholar", "bond-sage"] });
+  await go(page, "Boon");
+  await page.waitForTimeout(1400);
+  await shot(page, "boons");
+  await context.close();
+}
+
+// the records: trophies and run history
+{
+  const { page, context } = await open();
+  await page.evaluate(() => {
+    const t = window.__tourney;
+    t.session.award(["first-blood", "growing-up", "fully-grown", "better-together", "united-front", "goblin-toppled", "lich-laid-to-rest", "knight-crown", "twice-blessed"]);
+    const rec = (ago, d, seed, won, round, wins, team, endless = false) => ({ t: Date.now() - ago, difficulty: d, seed, outcome: won ? "won" : "lost", round, endless, wins, team });
+    t.session.profile.records = [rec(3.6e6, "knight", 4821, true, 12, 11, ["mammoth", "dryad", "unicorn", "wyrm", "pegasus"]), rec(8.6e7, "squire", 77, false, 9, 7, ["wolf", "boar", "bear", "tiger"]), rec(1.7e8, "knight", 9, false, 17, 15, ["lich", "skeleton", "zombie", "mummy", "wraith"], true), rec(2.6e8, "champion", 31337, false, 6, 4, ["ember", "droplet", "pebble"])];
+    t.session.profile.best.knight = { round: 12, wins: 1 };
+    t.session.profile.depth.knight = 17;
+  });
+  await go(page, "Trophies");
+  await page.waitForTimeout(900);
+  await shot(page, "trophies");
+  await page.evaluate(() => window.__tourney.game.scene.getScene("Trophies").show("runs", window.__tourney.session));
+  await page.waitForTimeout(300);
+  await shot(page, "runs");
   await context.close();
 }
 

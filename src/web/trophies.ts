@@ -1,39 +1,93 @@
 import Phaser from "phaser";
 
 import { TROPHIES } from "../engine/achievements.js";
+import { species } from "../engine/data.js";
 import type { Audio } from "./audio.js";
 import type { Session } from "./session.js";
-import { COLOR, H, W, backdrop, button, fadeIn, go, panel, text } from "./ui.js";
+import { COLOR, W, backdrop, button, fadeIn, go, panel, text } from "./ui.js";
 
 export class Trophies extends Phaser.Scene {
+  private page: Phaser.GameObjects.GameObject[] = [];
+  private tabs: Record<"trophies" | "runs", Phaser.GameObjects.Container> | null = null;
+
   constructor() {
     super("Trophies");
   }
 
   create(): void {
     const session = this.registry.get("session") as Session;
+    this.page = [];
     (this.registry.get("audio") as Audio).music("menu");
     fadeIn(this);
     backdrop(this, 1.2);
     panel(this, 0, 0, W, 54, "ui_ancient_brown");
-    text(this, 18, 26, "Trophies", 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
-    const owned = session.profile.trophies;
-    text(this, 190, 27, `${owned.length} of ${TROPHIES.length}`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5);
+    text(this, 18, 26, "Records", 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
+    this.tabs = {
+      trophies: button(this, 330, 27, "Trophies", () => this.show("trophies", session), { w: 150, h: 38, color: "blue", size: 20 }),
+      runs: button(this, 492, 27, "Run history", () => this.show("runs", session), { w: 160, h: 38, color: "blue", size: 20 }),
+    };
     button(this, 880, 27, "Back", () => go(this, "Menu"), { w: 130, h: 40, color: "grey", size: 20 });
-
     panel(this, 12, 64, W - 24, 464, "ui_ancient_brown");
+    this.show("trophies", session);
+  }
+
+  private show(tab: "trophies" | "runs", session: Session): void {
+    for (const o of this.page) o.destroy();
+    this.page = [];
+    this.tabs?.trophies.setAlpha(tab === "trophies" ? 1 : 0.55);
+    this.tabs?.runs.setAlpha(tab === "runs" ? 1 : 0.55);
+    if (tab === "trophies") this.drawTrophies(session);
+    else this.drawRuns(session);
+  }
+
+  private keep<T extends Phaser.GameObjects.GameObject>(o: T): T {
+    this.page.push(o);
+    return o;
+  }
+
+  private drawTrophies(session: Session): void {
+    const owned = session.profile.trophies;
+    this.keep(text(this, 560, 27, `${owned.length} of ${TROPHIES.length}`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
     TROPHIES.forEach((t, i) => {
       const col = i % 2;
       const row = Math.floor(i / 2);
       const x = 32 + col * 468;
-      const y = 84 + row * 54;
+      const y = 78 + row * 49;
       const got = owned.includes(t.id);
-      this.add.rectangle(x + 216, y + 22, 440, 48, got ? 0x4a3a22 : 0x2f2418, 0.85).setStrokeStyle(3, got ? 0xf2c14e : 0x4a3a2a);
-      const star = this.add.image(x + 26, y + 22, "star").setScale(3);
+      this.keep(this.rect(x + 216, y + 20, 440, 44, got ? 0x4a3a22 : 0x2f2418, got ? 0xf2c14e : 0x4a3a2a));
+      const star = this.image(x + 26, y + 20, "star", 3);
       if (!got) star.setTintFill(0x1a1410).setAlpha(0.8);
-      text(this, x + 56, y + 6, got ? t.name : "???", 22, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 });
-      text(this, x + 56, y + 28, t.text, 15, got ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2 });
+      this.keep(text(this, x + 56, y + 4, got ? t.name : "???", 21, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
+      this.keep(text(this, x + 56, y + 25, t.text, 14, got ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2 }));
     });
-    void H;
+  }
+
+  private drawRuns(session: Session): void {
+    const best = session.profile.best;
+    const bests = (["squire", "knight", "champion"] as const).map((d) => `${d[0]!.toUpperCase()}${d.slice(1)}: ${best[d].round > 0 ? `round ${best[d].round}` : "-"}${best[d].wins ? `, ${best[d].wins} won` : ""}${session.profile.depth[d] ? `, depth ${session.profile.depth[d]}` : ""}`);
+    this.keep(text(this, W / 2, 84, bests.join("     "), 18, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 4 }).setOrigin(0.5));
+    const records = session.profile.records;
+    if (records.length === 0) {
+      this.keep(text(this, W / 2, 280, "No finished runs yet.", 26, COLOR.muted).setOrigin(0.5));
+      return;
+    }
+    records.slice(0, 8).forEach((r, i) => {
+      const y = 106 + i * 51;
+      const won = r.outcome === "won";
+      this.keep(this.rect(W / 2, y + 22, 910, 46, won ? 0x4a3a22 : 0x2f2418, won ? 0xf2c14e : 0x4a3a2a));
+      const result = r.endless ? `Depth ${r.round}` : won ? "Champion" : `Round ${r.round}`;
+      this.keep(text(this, 44, y + 6, result, 22, won ? COLOR.gold : COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 3 }));
+      this.keep(text(this, 44, y + 28, `${r.difficulty[0]!.toUpperCase()}${r.difficulty.slice(1)}  ·  seed ${r.seed}  ·  ${new Date(r.t).toLocaleDateString()}`, 13, COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2 }));
+      this.keep(text(this, 330, y + 14, `${r.wins} won`, 20, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 3 }));
+      r.team.forEach((sp, k) => this.keep(this.add.sprite(520 + k * 52, y + 22, "creatures", species(sp).frames[0]).setScale(2.4)));
+    });
+  }
+
+  private rect(x: number, y: number, w: number, h: number, fill: number, stroke: number): Phaser.GameObjects.Rectangle {
+    return this.add.rectangle(x, y, w, h, fill, 0.85).setStrokeStyle(3, stroke);
+  }
+
+  private image(x: number, y: number, key: string, scale: number): Phaser.GameObjects.Image {
+    return this.keep(this.add.image(x, y, key).setScale(scale));
   }
 }

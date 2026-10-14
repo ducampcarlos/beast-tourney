@@ -34,8 +34,8 @@ jobs:
       - run: npm ci
       - run: npx playwright-core install --with-deps chromium
       - run: npm run build
-      - name: The committed docs/game.js must match the sources
-        run: git diff --exit-code docs/game.js
+      - name: The committed docs/game.js and docs/precache.json must match the sources
+        run: git diff --exit-code docs/game.js docs/precache.json
       - run: npm run test:e2e
 
   balance:

@@ -7,6 +7,14 @@
 <meta name="description" content="Beast Tourney: a fantasy creature auto-battler. Buy, merge and bond a team of beasts, then watch them fight through a 12-round tournament.">
 <title>Beast Tourney</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta property="og:title" content="Beast Tourney">
+<meta property="og:description" content="A fantasy creature auto-battler for the browser. Buy, merge and bond beasts, then fight through a 12-round tournament.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://ducampcarlos.github.io/beast-tourney/assets/img/preview.png">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   @font-face { font-family: "KenneyPixel"; src: url("assets/fonts/KenneyPixel.ttf") format("truetype"); font-display: block; }
   @font-face { font-family: "KenneyMini"; src: url("assets/fonts/KenneyMiniSquare.ttf") format("truetype"); font-display: block; }
@@ -25,5 +33,12 @@
 <div id="rotate">Turn your device sideways for a bigger game</div>
 <noscript>Beast Tourney needs JavaScript to run.</noscript>
 <script src="game.js"></script>
+<script>
+  // Offline support. Not on file:// or in the local dev server (localhost), where a stale cache would only get in the way.
+  if ("serviceWorker" in navigator) {
+    if (location.protocol.startsWith("http") && location.hostname !== "localhost") addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    else navigator.serviceWorker.getRegistrations().then((all) => all.forEach((r) => r.unregister())).catch(() => {});
+  }
+</script>
 </body>
 </html>

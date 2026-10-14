@@ -15,7 +15,7 @@ The code is MIT (see `LICENSE`). Third-party code: [Phaser 3](https://phaser.io)
 | Fonts (`fonts/*.ttf`): Kenney Pixel, Kenney Mini Square | Kenney Fonts | Kenney | https://kenney.nl/assets/kenney-fonts |
 | Sparks, flames, smoke and rings (`img/fx_*.png`, resized to 64 px) | Particle Pack | Kenney | https://kenney.nl/assets/particle-pack |
 
-The coin, the stars and the shadow are drawn in code (`src/web/ui.ts`, `src/web/creature.ts`).
+The coin, the stars and the shadow are drawn in code (`src/web/ui.ts`, `src/web/creature.ts`). The app icons (`docs/assets/img/icon-*.png`, `apple-touch-icon.png`) are an original pixel drawing made for this project, and `preview.png` is a screenshot of the game.
 
 ## Sound effects (`docs/assets/sfx/`)
 

@@ -336,6 +336,8 @@ await test("winning the final boss ends in a victory screen and records the resu
   await scene(page, "End");
   const best = await page.evaluate(() => window.__tourney.session.profile.best.squire);
   assert.deepEqual(best, { round: 12, wins: 1 });
+  const record = await page.evaluate(() => window.__tourney.session.profile.records[0]);
+  assert.deepEqual([record.outcome, record.difficulty, record.round, record.endless, record.team.length], ["won", "squire", 12, false, 5]);
   await page.context().close();
 });
 
@@ -612,8 +614,68 @@ await test("trophies are earned in play, saved, and listed", async () => {
   await click(page, { x: 580, y: 424 }); // Trophies
   await scene(page, "Trophies");
   assert.ok((await page.evaluate(() => window.__tourney.session.profile.trophies)).includes("first-blood"));
+  await click(page, { x: 492, y: 27 }); // the run history tab
+  await click(page, { x: 330, y: 27 }); // and back to the trophies
   await click(page, { x: 880, y: 27 }); // Back
   await scene(page, "Menu");
+  await page.context().close();
+});
+
+await test("is installable: a valid manifest, and it keeps working with no connection after the first visit", async () => {
+  const page = await newPage();
+  const manifest = await page.evaluate(async () => {
+    const href = document.querySelector('link[rel="manifest"]').href;
+    return { href, json: await (await fetch(href)).json() };
+  });
+  assert.equal(manifest.json.name, "Beast Tourney");
+  assert.ok(manifest.json.icons.some((i) => i.sizes === "512x512"));
+  for (const icon of manifest.json.icons) assert.equal((await page.request.get(new URL(icon.src, manifest.href).href)).status(), 200);
+  // wait for the service worker to take control and finish filling its cache
+  await page.waitForFunction(async () => {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg?.active || !navigator.serviceWorker.controller) return false;
+    const keys = await caches.keys();
+    if (keys.length !== 1) return false;
+    const meta = await (await fetch("precache.json", { cache: "no-store" })).json();
+    return (await (await caches.open(keys[0])).keys()).length >= meta.files.length;
+  }, null, { timeout: 30000 });
+  await page.context().setOffline(true);
+  await page.reload();
+  await scene(page, "Menu");
+  await click(page, { x: 480, y: 322 }); // and the game plays
+  await scene(page, "Shop");
+  await drag(page, cardXY(0), slotXY(0));
+  assert.equal((await run(page)).gold, 7);
+  await page.context().close();
+});
+
+await test("survives a monkey: hundreds of random clicks, drags and keys across the menu, the shop and battles", async () => {
+  const page = await newPage("?debug&seed=2024");
+  let rng = 12345; // a small deterministic generator, so a failure can be replayed
+  const rand = (n) => ((rng = (Math.imul(rng, 1664525) + 1013904223) >>> 0) % n);
+  const keys = ["r", "f", "z", "m", " ", "Escape", "Enter"];
+  const scenesSeen = new Set();
+  await page.evaluate(() => window.__tourney.session.noteSeen(["wolf"]));
+  for (let i = 0; i < 700; i++) {
+    const a = rand(10);
+    if (a < 5) await page.mouse.click(rand(960), rand(540));
+    else if (a < 8) {
+      await page.mouse.move(rand(960), rand(540));
+      await page.mouse.down();
+      await page.mouse.move(rand(960), rand(540), { steps: 3 });
+      await page.mouse.up();
+    } else await page.keyboard.press(keys[rand(keys.length)]);
+    if (i % 25 === 0) {
+      const state = await page.evaluate(() => ({ scenes: window.__tourney.game.scene.getScenes(true).map((x) => x.scene.key), run: window.__tourney.session.run && { gold: window.__tourney.session.run.gold, lives: window.__tourney.session.run.lives, round: window.__tourney.session.run.round } }));
+      state.scenes.forEach((k) => scenesSeen.add(k));
+      if (state.run) assert.ok(state.run.gold >= 0 && state.run.lives >= 0 && state.run.round >= 1, JSON.stringify(state));
+    }
+    if (i % 60 === 59) await page.waitForTimeout(150);
+  }
+  console.log("       scenes visited:", [...scenesSeen].join(", "));
+  assert.ok(scenesSeen.size >= 2, `only saw ${[...scenesSeen]}`);
+  // still alive: the game answers
+  assert.ok(await page.evaluate(() => window.__tourney.game.scene.getScenes(true).length >= 1));
   await page.context().close();
 });
 

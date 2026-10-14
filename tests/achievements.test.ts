@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { TROPHIES, bondTiers, hasTrophy, newTrophies, trophy, type Facts } from "../src/engine/achievements.js";
 import { SPECIES_LIST, species } from "../src/engine/data.js";
 import type { Unit } from "../src/engine/types.js";
-import { parseProfile } from "../src/web/session.js";
+import { MAX_RECORDS, parseProfile } from "../src/web/session.js";
 
 const u = (uid: number, sp: string, extra: Partial<Unit> = {}): Unit => ({ uid, sp, atk: species(sp).atk, hp: species(sp).hp, level: 1, exp: 0, ...extra });
 const earned = (facts: Facts, owned: string[] = []) => newTrophies(owned, facts);
@@ -86,6 +86,14 @@ describe("the saved profile", () => {
     expect(bad).toMatchObject({ speed: 1, muted: false, trophies: [], runs: 0 });
     expect(bad.sfxVolume).toBeLessThanOrEqual(1);
     expect(bad.best.knight.round).toBe(0);
+  });
+
+  it("keeps well-formed run records and drops the rest", () => {
+    const good = { t: 1700000000000, difficulty: "knight", seed: 42, outcome: "won", round: 12, endless: false, wins: 11, team: ["wolf", "boar"] };
+    const profile = parseProfile(JSON.stringify({ records: [good, { ...good, outcome: "tie" }, { ...good, team: ["wolf", "nope"] }, { ...good, round: 0 }, { ...good, difficulty: "easy" }, { ...good, team: Array(6).fill("wolf") }, "x", null, { ...good, seed: -1 }, { ...good, endless: "no" }, { ...good, round: 20, endless: true, outcome: "lost" }] }));
+    expect(profile.records).toEqual([good, { ...good, round: 20, endless: true, outcome: "lost" }]);
+    expect(parseProfile(JSON.stringify({ records: Array(40).fill(good) })).records).toHaveLength(MAX_RECORDS);
+    expect(parseProfile(JSON.stringify({ records: "all of them" })).records).toEqual([]);
   });
 
   it("survives garbage", () => {
