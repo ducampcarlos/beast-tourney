@@ -318,7 +318,9 @@ await test("a lost run ends on the elimination screen, which can start over or r
   await click(page, { x: 480, y: 392 });
   await scene(page, "End");
   assert.equal((await page.evaluate(() => window.__tourney.session.run?.phase)), "lost");
-  await click(page, { x: 330, y: 450 }); // New Run
+  await click(page, { x: 480, y: 450 }); // Copy result: harmless even where the clipboard is off limits
+  await page.waitForTimeout(150);
+  await click(page, { x: 250, y: 450 }); // New Run
   await scene(page, "Shop");
   const r = await run(page);
   assert.deepEqual([r.round, r.lives, r.phase, r.difficulty], [1, 3, "shop", "champion"]);
@@ -350,7 +352,7 @@ await test("after winning, Endless mode carries on past round 12 and records the
   await finishBattle(page);
   await click(page, { x: 480, y: 392 });
   await scene(page, "End");
-  await click(page, { x: 480, y: 450 }); // Endless
+  await click(page, { x: 401, y: 450 }); // Endless
   await scene(page, "Shop");
   let r = await run(page);
   assert.deepEqual([r.endless, r.round, r.phase], [true, 13, "shop"]);

@@ -3,6 +3,7 @@ import Phaser from "phaser";
 import { species } from "../engine/data.js";
 import { MAX_ROUNDS } from "../engine/enemy.js";
 import { type Run, continueEndless } from "../engine/run.js";
+import { shareText } from "../engine/share.js";
 import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import { burst } from "./fx.js";
@@ -54,26 +55,28 @@ export class End extends Phaser.Scene {
     ].filter(Boolean);
     text(this, W / 2, 350, lines.join("\n"), 22, COLOR.cream, { align: "center", lineSpacing: 8 }).setOrigin(0.5, 0);
 
-    button(this, W / 2 - 230, 450, "New Run", () => {
+    const offerEndless = won && !run.endless;
+    // The tournament is won; the Depths are for those who want more, so the row has four buttons.
+    const xs = offerEndless ? [-237, -79, 79, 237] : [-230, 0, 230];
+    const w = offerEndless ? 144 : 190;
+    const size = offerEndless ? 22 : 26;
+    button(this, W / 2 + xs[0]!, 450, "New Run", () => {
       session.start(run.difficulty);
       go(this, "Shop");
-    }, { w: 190, h: 50, color: "green", size: 26 });
-    if (won && !run.endless) {
-      // The tournament is won; the Depths are for those who want more.
-      button(this, W / 2, 450, "Endless", () => {
+    }, { w, h: 50, color: "green", size });
+    let i = 1;
+    if (offerEndless) {
+      button(this, W / 2 + xs[i++]!, 450, "Endless", () => {
         const next = continueEndless(run);
         if (!next.ok) return;
         session.update(next.run);
         go(this, "Shop");
-      }, { w: 190, h: 50, color: "yellow", size: 26 });
-    } else {
-      const share = button(this, W / 2, 450, "Copy result", () => {
-        const where = run.endless ? `reached round ${run.round} in the Endless Depths` : won ? "champion" : `out in round ${run.round}`;
-        const summary = `Beast Tourney - ${run.difficulty}, seed ${run.seed}: ${where} (${wins} rounds won)`;
-        void navigator.clipboard?.writeText(summary).then(() => share.setLabel("Copied!"), () => share.setLabel("Copy failed"));
-      }, { w: 190, h: 50, color: "blue", size: 22 }) as Button;
+      }, { w, h: 50, color: "yellow", size });
     }
-    button(this, W / 2 + 230, 450, "Menu", () => go(this, "Menu"), { w: 190, h: 50, color: "grey", size: 24 });
+    const share = button(this, W / 2 + xs[i++]!, 450, "Copy result", () => {
+      void navigator.clipboard?.writeText(shareText(run)).then(() => share.setLabel("Copied!"), () => share.setLabel("Copy failed"));
+    }, { w, h: 50, color: "blue", size: offerEndless ? 20 : 22 }) as Button;
+    button(this, W / 2 + xs[i]!, 450, "Menu", () => go(this, "Menu"), { w, h: 50, color: "grey", size });
 
     if (won) for (let i = 0; i < 8; i++) this.time.delayedCall(i * 220, () => burst(this, 120 + Math.random() * 720, 120 + Math.random() * 220, "fx_star_01", 18, [0xffe27a, 0xff9d6b, 0x9dd8ff][i % 3]!, 260, 50));
     (window as unknown as { __tourney?: Record<string, unknown> }).__tourney && ((window as unknown as { __tourney: Record<string, unknown> }).__tourney.end = { run });

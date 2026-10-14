@@ -25,7 +25,7 @@ Each turn you get 10 gold. Spend it in the shop, then press **Fight**: the two t
 
 <p align="center"><img src="assets/boons.png" alt="Choosing a boon after a boss" width="390"> <img src="assets/boss.png" alt="The Lich Lord, a boss, towering over its escort" width="390"></p>
 
-**Everything else:** 55 creatures with flavour text and three levels each; a **Bestiary** that fills in as you meet them, with every faction's bonds; 18 **trophies** and a **run history** that remembers your teams; three ranks (Squire, Knight, Champion); a **Daily Run** with the same seed for everybody; saves you can resume after closing the tab; hover any enemy to see what you are about to fight; speed control and skip in battle; settings for music, effects and default speed; and a layout that fits any screen. It can be **installed** like an app and **plays offline** after the first visit.
+**Everything else:** 55 creatures with flavour text and three levels each; a **Bestiary** that fills in as you meet them, with every faction's bonds; 18 **trophies** and a **run history** that remembers your teams; three ranks (Squire, Knight, Champion); a **Daily Run** with the same seed for everybody; saves you can resume after closing the tab; hover any enemy to see what you are about to fight, and any creature in battle to read its ability and status; a **result you can copy and share** (a verdict and one coloured square per round); an announcement when the shop reaches a new tier; speed control and skip in battle; settings for music, effects, default speed and screen shake; and a layout that fits any screen. It can be **installed** like an app and **plays offline** after the first visit.
 
 <p align="center"><img src="assets/trophies.png" alt="The trophies" width="390"> <img src="assets/runs.png" alt="The run history, each run with the team that finished it" width="390"></p>
 
@@ -75,7 +75,7 @@ docs/         the site GitHub Pages serves: index.html, assets, the built game.j
 ## Tests
 
 ```bash
-npm test            # 148 tests: rules, shop, boons, Endless, enemies, trophies, saves, content, bots, balance bands
+npm test            # 151 tests: rules, shop, boons, Endless, enemies, trophies, saves, content, bots, balance bands
 npm run test:e2e    # 38 end-to-end tests in a real Chromium (needs: npm run build)
 ```
 
