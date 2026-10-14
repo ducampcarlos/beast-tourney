@@ -150,18 +150,18 @@ export function backdrop(scene: Phaser.Scene, wallRows = 1.5): Phaser.GameObject
 }
 
 /** A modal panel with a title, wrapped lines and a close button. Returns a function that closes it. */
-export function overlay(scene: Phaser.Scene, title: string, lines: string[], onClose?: () => void, width = 760): () => void {
+export function overlay(scene: Phaser.Scene, title: string, lines: string[], onClose?: () => void, width = 760, depth = 2000): () => void {
   const objects: Phaser.GameObjects.GameObject[] = [];
-  const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setDepth(2000).setInteractive();
+  const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setDepth(depth).setInteractive();
   const height = 440;
-  const box = panel(scene, W / 2 - width / 2, H / 2 - height / 2, width, height, "ui_ancient_brown").setDepth(2001);
-  const head = text(scene, W / 2, H / 2 - height / 2 + 36, title, 36, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(2002);
-  const body = text(scene, W / 2 - width / 2 + 36, H / 2 - height / 2 + 76, lines.join("\n\n"), 20, COLOR.cream, { wordWrap: { width: width - 72 }, lineSpacing: 3, stroke: "#2a1f1a", strokeThickness: 3 }).setDepth(2002);
+  const box = panel(scene, W / 2 - width / 2, H / 2 - height / 2, width, height, "ui_ancient_brown").setDepth(depth + 1);
+  const head = text(scene, W / 2, H / 2 - height / 2 + 36, title, 36, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(depth + 2);
+  const body = text(scene, W / 2 - width / 2 + 36, H / 2 - height / 2 + 76, lines.join("\n\n"), 20, COLOR.cream, { wordWrap: { width: width - 72 }, lineSpacing: 3, stroke: "#2a1f1a", strokeThickness: 3 }).setDepth(depth + 2);
   const close = () => {
     for (const o of objects) o.destroy();
     onClose?.();
   };
-  const b = button(scene, W / 2, H / 2 + height / 2 - 40, "Got it", close, { w: 200, h: 48, color: "green", size: 24 }).setDepth(2003);
+  const b = button(scene, W / 2, H / 2 + height / 2 - 40, "Got it", close, { w: 200, h: 48, color: "green", size: 24 }).setDepth(depth + 3);
   objects.push(dim, box, head, body, b);
   scene.input.keyboard?.once("keydown-ESC", close);
   return close;

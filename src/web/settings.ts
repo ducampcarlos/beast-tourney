@@ -64,11 +64,19 @@ export function openSettings(scene: Phaser.Scene, onClose?: () => void): void {
     speed.setLabel(`x${session.profile.speed}`);
   }, { w: 150, h: 42, size: 22, color: "blue" }).setDepth(D + 2)) as Button;
 
+  let creditsOpen = false;
+  const onEsc = (): void => {
+    if (!creditsOpen) close(); // the credits close themselves with the same key
+  };
   const close = () => {
+    scene.input.keyboard?.off("keydown-ESC", onEsc);
     for (const o of objects) o.destroy();
     onClose?.();
   };
-  add(button(scene, W / 2 - 110, 424, "Credits", () => overlay(scene, "Credits", CREDITS_LINES), { w: 190, h: 46, size: 22, color: "grey" }).setDepth(D + 2));
+  add(button(scene, W / 2 - 110, 424, "Credits", () => {
+    creditsOpen = true;
+    overlay(scene, "Credits", CREDITS_LINES, () => (creditsOpen = false), 760, D + 100);
+  }, { w: 190, h: 46, size: 22, color: "grey" }).setDepth(D + 2));
   add(button(scene, W / 2 + 110, 424, "Done", close, { w: 190, h: 46, size: 24, color: "green" }).setDepth(D + 2));
-  scene.input.keyboard?.once("keydown-ESC", close);
+  scene.input.keyboard?.on("keydown-ESC", onEsc);
 }

@@ -115,7 +115,7 @@ export class Battle extends Phaser.Scene {
       v.setScale(0.2);
       this.tweens.add({ targets: v, scale: 1, duration: 260 / this.speed, ease: "Back.easeOut" });
     }
-    v.setInteractive(new Phaser.Geom.Rectangle(-42, -48, 84, 104), Phaser.Geom.Rectangle.Contains);
+    v.makeInteractive();
     v.on("pointerover", () => this.showTip(v));
     v.on("pointerout", () => this.hideTip());
     this.views.set(u.uid, v);

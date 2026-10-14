@@ -238,8 +238,7 @@ export class Shop extends Phaser.Scene {
     const v = new CreatureView(this, slotX(slot), SLOT_Y, { sp: u.sp, level: u.level, exp: u.exp, atk: u.atk, hp: u.hp, relic: u.relic });
     v.uid = u.uid;
     v.setDepth(10);
-    v.setInteractive(new Phaser.Geom.Rectangle(-42, -48, 84, 104), Phaser.Geom.Rectangle.Contains);
-    v.input!.cursor = "grab";
+    v.makeInteractive("grab");
     this.input.setDraggable(v);
     v.setData("kind", "unit");
     v.on("pointerover", () => this.setHover({ kind: "unit", slot: v.getData("slot") as number }));
@@ -273,8 +272,7 @@ export class Shop extends Phaser.Scene {
       const sp = species(offer.sp);
       const v = new CreatureView(this, cardX(i), CARD_Y - 6, { sp: sp.id, atk: sp.atk, hp: sp.hp });
       v.setDepth(10);
-      v.setInteractive(new Phaser.Geom.Rectangle(-42, -48, 84, 104), Phaser.Geom.Rectangle.Contains);
-      v.input!.cursor = "grab";
+      v.makeInteractive("grab");
       this.input.setDraggable(v);
       v.setData("kind", "offer").setData("index", i);
       v.on("pointerover", () => this.setHover({ kind: "offer", index: i }));

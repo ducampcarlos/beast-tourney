@@ -103,6 +103,20 @@ export class CreatureView extends Phaser.GameObjects.Container {
     if (id) this.relicIcon.setFrame(relicDef(id).icon);
   }
 
+  /**
+   * Make the whole creature (sprite and stat badges, with a little margin) respond to the pointer.
+   * A container's hit area is measured from its top-left corner, not from its centre, so the
+   * rectangle has to be shifted by the display origin; a rectangle given in centred coordinates
+   * silently covers only the upper-left part of the creature.
+   */
+  makeInteractive(cursor?: string): this {
+    const u = this.unitSize;
+    const area = new Phaser.Geom.Rectangle(this.displayOriginX - 50 * u, this.displayOriginY - 56 * u, 100 * u, 122 * u);
+    this.setInteractive(area, Phaser.Geom.Rectangle.Contains);
+    if (cursor && this.input) this.input.cursor = cursor;
+    return this;
+  }
+
   setStatuses(statuses: readonly Status[]): void {
     this.statusList = [...statuses];
     this.barrier.setVisible(statuses.includes("barrier"));

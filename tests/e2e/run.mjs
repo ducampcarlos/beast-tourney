@@ -384,6 +384,32 @@ await test("hovering an enemy in the preview shows what it is", async () => {
   await page.context().close();
 });
 
+await test("a creature can be grabbed anywhere on it, corners and stat badges included", async () => {
+  const page = await newPage();
+  await startRun(page, 12);
+  const hovered = () => page.evaluate(() => window.__tourney.game.scene.getScene("Shop").hover?.kind ?? null);
+  // (the freeze lock sits over the top-right corner of an offer, so that corner is left out)
+  const corners = [[-38, -40], [-38, 46], [38, 46], [38, 0], [0, 0]];
+  for (const [dx, dy] of corners) {
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(220);
+    await page.mouse.move(cardXY(0).x + dx, cardXY(0).y + dy);
+    await page.waitForTimeout(200);
+    assert.equal(await hovered(), "offer", `offer, offset ${dx},${dy}`);
+  }
+  // and a drag that starts on its lower-right corner (the attack and health badges) buys it
+  await drag(page, { x: cardXY(0).x + 36, y: cardXY(0).y + 46 }, slotXY(0));
+  assert.equal((await run(page)).team.filter(Boolean).length, 1);
+  for (const [dx, dy] of corners) {
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(220);
+    await page.mouse.move(slotXY(0).x + dx, slotXY(0).y + dy);
+    await page.waitForTimeout(200);
+    assert.equal(await hovered(), "unit", `unit, offset ${dx},${dy}`);
+  }
+  await page.context().close();
+});
+
 await test("continues a saved run after a reload", async () => {
   const page = await newPage("?debug&nohelp&seed=21");
   await click(page, { x: 480, y: 322 });
@@ -479,6 +505,15 @@ await test("the credits are reachable from the settings", async () => {
   const page = await newPage();
   await click(page, { x: 580, y: 470 }); // Settings
   await click(page, { x: 370, y: 420 }); // Credits
+  const open = (label) => page.evaluate((l) => window.__tourney.game.scene.getScenes(true)[0].children.list.some((c) => c.text === l), label);
+  // the credits sit above the settings: a click on the Done button underneath does nothing
+  await click(page, { x: 640, y: 424 });
+  assert.ok((await open("Credits")) && (await open("Settings")));
+  // and Escape closes the credits only, then the settings
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  assert.ok(!(await open("Credits")) && (await open("Settings")));
+  await click(page, { x: 370, y: 420 }); // Credits again
   await click(page, { x: 480, y: 450 }); // Got it
   await click(page, { x: 590, y: 420 }); // Done
   await click(page, { x: 480, y: 322 }); // the menu is usable again
