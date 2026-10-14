@@ -82,6 +82,11 @@ export class Menu extends Phaser.Scene {
     this.pick(this.difficulty, false);
     void best;
 
+    if (this.registry.get("reopenSettings")) {
+      this.registry.set("reopenSettings", false);
+      openSettings(this);
+    }
+
     this.input.keyboard?.on("keydown-ENTER", () => this.begin(session, seedParam ? Number(seedParam) >>> 0 : undefined));
   }
 

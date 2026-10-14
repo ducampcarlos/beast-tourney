@@ -84,7 +84,7 @@ docs/         the site GitHub Pages serves: index.html, assets, the built game.j
 
 ```bash
 npm test            # 233 tests: rules, shop, boons, Endless, enemies, trophies, saves, content, bots, balance bands
-npm run test:e2e    # 44 end-to-end tests in a real Chromium (needs: npm run build)
+npm run test:e2e    # 45 end-to-end tests in a real Chromium (needs: npm run build)
 ```
 
 The unit tests cover every ability trigger and effect, each status, each bond, each of the fifteen boons, each oath, each of the twelve skills, merging and levelling, selling, freezing, relics, the whole ladder (including losing the final and drawing), Endless mode, determinism, and save tampering (dozens of kinds of impossible values are refused, and saves from before a feature existed still load). A fuzz test throws up to 6,000 random commands at the shop and 1,500 random fights at the battle engine and checks the invariants hold. The end-to-end tests drive the real built game with a real mouse and a real finger: dragging to buy, merge, sell and equip, undo, double-tap, a battle played in real time, a lost run, a won tournament, Endless mode, choosing boons, resuming after a reload, a corrupted save, the settings, trophies, a canvas from phone to 1080p, going offline after the first visit, and a "monkey" that clicks, drags and types at random for hundreds of actions without a single error. Writing them found real bugs, among them a second boon that could not be taken because a scene kept its state between visits.

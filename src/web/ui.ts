@@ -154,10 +154,13 @@ export function backdrop(scene: Phaser.Scene, wallRows = 1.5): Phaser.GameObject
 export function overlay(scene: Phaser.Scene, title: string, lines: string[], onClose?: () => void, width = 760, depth = 2000): () => void {
   const objects: Phaser.GameObjects.GameObject[] = [];
   const dim = scene.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.7).setDepth(depth).setInteractive();
-  const height = 440;
+  const height = 484;
   const box = panel(scene, W / 2 - width / 2, H / 2 - height / 2, width, height, "ui_ancient_brown").setDepth(depth + 1);
-  const head = text(scene, W / 2, H / 2 - height / 2 + 36, t(title), 36, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(depth + 2);
-  const body = text(scene, W / 2 - width / 2 + 36, H / 2 - height / 2 + 76, lines.map((line) => t(line)).join("\n\n"), 20, COLOR.cream, { wordWrap: { width: width - 72 }, lineSpacing: 3, stroke: "#2a1f1a", strokeThickness: 3 }).setDepth(depth + 2);
+  const head = text(scene, W / 2, H / 2 - height / 2 + 34, t(title), 34, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 8 }).setOrigin(0.5).setDepth(depth + 2);
+  const body = text(scene, W / 2 - width / 2 + 36, H / 2 - height / 2 + 68, lines.map((line) => t(line)).join("\n\n"), 20, COLOR.cream, { wordWrap: { width: width - 72 }, lineSpacing: 3, stroke: "#2a1f1a", strokeThickness: 3 }).setDepth(depth + 2);
+  // longer texts (other languages, more paragraphs) shrink until they fit between the title and the button
+  const room = height - 68 - 78;
+  for (let size = 19; body.height > room && size >= 12; size--) body.setFontSize(size);
   const close = () => {
     for (const o of objects) o.destroy();
     onClose?.();

@@ -563,31 +563,57 @@ await test("the language follows the browser, can be changed in the settings, an
   assert.ok((await texts(fr)).includes("New Run"));
   await fr.context().close();
 
-  // the Language button cycles English -> Spanish -> Portuguese -> English, and the menu is drawn again each time
+  // the Language button cycles English -> Spanish -> Portuguese -> English; the menu is drawn again each
+  // time and the settings stay open, so the player can see the change and keep going
   const page = await newPage();
   const lang = () => page.evaluate(() => ({ profile: window.__tourney.session.profile.lang, html: document.documentElement.lang }));
+  const settingsOpen = () => page.evaluate(() => window.__tourney.game.scene.getScenes(true).some((sc) => sc.children.list.some((o) => o.depth === 2000)));
   assert.deepEqual(await lang(), { profile: null, html: "en" });
   await click(page, { x: 580, y: 470 }); // Settings
+  assert.ok(await settingsOpen());
   await click(page, { x: 530, y: 322 }); // Language
   await page.waitForTimeout(300);
   assert.deepEqual(await lang(), { profile: "es", html: "es" });
+  assert.ok(await settingsOpen(), "the settings closed when the language changed");
   words = await texts(page);
   assert.ok(!words.includes("New Run") && !words.includes("Settings") && !words.includes("Daily Run"), `still English: ${words.join(" | ")}`);
-  await page.reload();
-  await scene(page, "Menu");
-  assert.deepEqual(await lang(), { profile: "es", html: "es" }); // remembered
-  assert.ok(!(await texts(page)).includes("New Run"));
-  // back to English by cycling through Portuguese
-  await click(page, { x: 580, y: 470 });
-  await click(page, { x: 530, y: 322 });
+  assert.ok(!words.includes("Language") && !words.includes("Export"), `the open settings are still English: ${words.join(" | ")}`);
+  await click(page, { x: 530, y: 322 }); // Portuguese
   await page.waitForTimeout(300);
   assert.equal((await lang()).profile, "pt");
-  await click(page, { x: 580, y: 470 });
-  await click(page, { x: 530, y: 322 });
+  assert.ok(await settingsOpen());
+  await page.reload();
+  await scene(page, "Menu");
+  assert.deepEqual(await lang(), { profile: "pt", html: "pt" }); // remembered
+  assert.ok(!(await texts(page)).includes("New Run"));
+  await click(page, { x: 580, y: 470 }); // Settings
+  await click(page, { x: 530, y: 322 }); // back to English
   await page.waitForTimeout(300);
   assert.equal((await lang()).profile, "en");
+  assert.ok(await settingsOpen());
   assert.ok((await texts(page)).includes("New Run"));
   await page.context().close();
+});
+
+await test("the how-to-play and credits panels fit in every language", async () => {
+  for (const locale of ["en-US", "es-AR", "pt-BR"]) {
+    for (const [label, x, y] of [["How to play", 380, 470], ["Credits", 0, 0]]) {
+      const page = await newPage("?debug&nohelp", { locale });
+      if (label === "Credits") {
+        await click(page, { x: 580, y: 470 }); // Settings
+        await click(page, { x: 370, y: 466 }); // Credits
+      } else await click(page, { x, y });
+      const fit = await page.evaluate((min) => {
+        const objects = window.__tourney.game.scene.getScenes(true)[0].children.list;
+        const top = Math.max(...objects.filter((o) => o.depth >= min && typeof o.text === "string").map((o) => o.text.length));
+        const body = objects.find((o) => o.depth >= min && typeof o.text === "string" && o.text.length === top);
+        const button = objects.find((o) => o.depth >= min && o.list && o.list.some((c) => typeof c.text === "string"));
+        return { bottom: body.y + body.height, buttonTop: button.y - 24 };
+      }, label === "Credits" ? 2100 : 2000);
+      assert.ok(fit.bottom <= fit.buttonTop, `${label} in ${locale}: text ends at ${fit.bottom}, the button starts at ${fit.buttonTop}`);
+      await page.context().close();
+    }
+  }
 });
 
 await test("a whole run can be played in Spanish and in Portuguese without an English word slipping through", async () => {

@@ -77,8 +77,9 @@ export function openSettings(scene: Phaser.Scene, onClose?: () => void): void {
     document.documentElement.lang = next;
     session.profile.lang = next;
     session.saveProfile();
-    // every scene draws its words once, so draw this one again in the new language
+    // every scene draws its words once, so draw this one again in the new language, with the settings open again
     close();
+    scene.registry.set("reopenSettings", true);
     scene.scene.restart();
   }, { w: 150, h: 40, size: 20, color: "blue" }).setDepth(D + 2));
 
