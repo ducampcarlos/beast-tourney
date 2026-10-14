@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 import { FACTION_DEFS, bondNeed, boon as boonDef, relic as relicDef, species } from "../engine/data.js";
 import { newTrophies } from "../engine/achievements.js";
-import { BOSS_ROUNDS, MAX_ROUNDS, bossName, dominantFaction, enemyTeam } from "../engine/enemy.js";
+import { MAX_ROUNDS, bossName, dominantFaction, enemyTeam, isBossRound } from "../engine/enemy.js";
 import { LIVES, BUY_COST, type Result, type Run, type ShopEvent, buy, buyRelic, fight, move, relicCost, roll, rollCost, sell, sellGold, teamUnits, toggleFreeze } from "../engine/run.js";
 import { describeAbility, STATUS_TEXT } from "../engine/text.js";
 import { FACTIONS, SLOTS, type FactionId, type Unit } from "../engine/types.js";
@@ -26,7 +26,7 @@ const RELIC_X = [800, 890];
 const RELIC_Y = 448;
 const SHOP_RECT = new Phaser.Geom.Rectangle(16, 262, 684, 222);
 
-type Selection = { kind: "unit"; slot: number } | { kind: "offer"; index: number } | { kind: "relic"; index: number } | { kind: "boon"; index: number } | null;
+type Selection = { kind: "unit"; slot: number } | { kind: "offer"; index: number } | { kind: "relic"; index: number } | { kind: "boon"; index: number } | { kind: "enemy"; index: number } | null;
 
 export class Shop extends Phaser.Scene {
   private session!: Session;
@@ -49,6 +49,7 @@ export class Shop extends Phaser.Scene {
   private fightButton!: Button;
   private rollButton!: Button;
   private undoButton!: Button;
+  private enemies: Unit[] = [];
   private history: Run[] = [];
   private selection: Selection = null;
   private hover: Selection = null;
@@ -178,8 +179,8 @@ export class Shop extends Phaser.Scene {
     for (const o of this.topExtras) o.destroy();
     this.topExtras = [];
     const run = this.run;
-    const boss = BOSS_ROUNDS.includes(run.round);
-    const round = text(this, 18, 26, `Round ${run.round}/${MAX_ROUNDS}`, 28, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
+    const boss = isBossRound(run.round);
+    const round = text(this, 18, 26, run.endless ? `Round ${run.round}` : `Round ${run.round}/${MAX_ROUNDS}`, 28, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
     this.topExtras.push(round);
     if (boss) this.topExtras.push(text(this, 200, 26, `BOSS: ${bossName(run.round)}`, 22, COLOR.red, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
     // lives as hearts
@@ -334,13 +335,17 @@ export class Shop extends Phaser.Scene {
     this.enemyExtras = [];
     const run = this.run;
     const team = enemyTeam(run.seed, run.round, run.attempt, run.difficulty);
+    this.enemies = team;
     this.session.noteSeen(team.map((u) => u.sp));
     const boss = bossName(run.round);
     this.enemyExtras.push(text(this, 728, 66, boss ? "Boss opponent" : "Next opponent", 18, boss ? COLOR.red : COLOR.cream));
     team.forEach((u, i) => {
       const sp = species(u.sp);
       const big = sp.tier === 6;
-      const s = this.add.sprite(922 - i * 42, 112, "creatures", sp.frames[u.level - 1]).setScale(big ? 3.4 : 2.6).setFlipX(true).setDepth(5);
+      const s = this.add.sprite(922 - i * 42, 112, "creatures", sp.frames[u.level - 1]).setScale(big ? 3.4 : 2.6).setFlipX(true).setDepth(5).setInteractive({ useHandCursor: true });
+      s.on("pointerover", () => this.setHover({ kind: "enemy", index: i }));
+      s.on("pointerout", () => this.setHover(null));
+      s.on("pointerup", () => (this.selection = this.selection?.kind === "enemy" && this.selection.index === i ? null : { kind: "enemy", index: i }));
       this.enemyExtras.push(s);
     });
     const dom = dominantFaction(team);
@@ -392,6 +397,19 @@ export class Shop extends Phaser.Scene {
         if (info.relic) line(`${relicDef(info.relic).name}: ${relicDef(info.relic).text}`, 16, COLOR.blue, 6);
         if (sp.flavor) line(sp.flavor, 14, COLOR.muted);
         if (target.kind === "unit" && this.selection?.kind === "unit") this.sellButton(target.slot);
+        return;
+      }
+    }
+    if (target?.kind === "enemy") {
+      const foe = this.enemies[target.index];
+      if (foe) {
+        const sp = species(foe.sp);
+        line(sp.name, 22, COLOR.red);
+        line(`Enemy  ·  ${FACTION_DEFS[sp.faction].name}  ·  Lv ${foe.level}`, 16, lighten(FACTION_DEFS[sp.faction].color, 0.5));
+        const relicBonus = foe.relic ? relicDef(foe.relic) : undefined;
+        line(`Attack ${foe.atk + (relicBonus?.atk ?? 0)}   Health ${foe.hp + (relicBonus?.hp ?? 0)}`, 18, COLOR.cream, 8);
+        if (sp.ability) line(describeAbility(sp.ability, foe.level, sp.faction), 18, COLOR.cream, 8);
+        if (relicBonus) line(`${relicBonus.name}: ${relicBonus.text}`, 16, COLOR.blue, 6);
         return;
       }
     }

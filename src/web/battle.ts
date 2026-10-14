@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 import type { BattleEvent, BattleStep, UnitView } from "../engine/battle.js";
 import { FACTION_DEFS, boon as boonDef, relic as relicDef, species } from "../engine/data.js";
-import { BOSS_ROUNDS, bossName } from "../engine/enemy.js";
+import { bossName, isBossRound } from "../engine/enemy.js";
 import { type FightResult, LIVES, type Run } from "../engine/run.js";
 import { newTrophies } from "../engine/achievements.js";
 import { TRIGGER_TEXT } from "../engine/text.js";
@@ -52,7 +52,7 @@ export class Battle extends Phaser.Scene {
   create(): void {
     this.session = this.registry.get("session") as Session;
     this.audio = this.registry.get("audio") as Audio;
-    const boss = BOSS_ROUNDS.includes(this.before.round);
+    const boss = isBossRound(this.before.round);
     fadeIn(this);
     this.audio.music(boss ? "boss" : "battle");
     backdrop(this, 1.5);
@@ -359,7 +359,7 @@ export class Battle extends Phaser.Scene {
     for (const t of this.bondTags) t.destroy();
 
     const bonds = this.result.battle.steps.flatMap((st) => st.events).filter((e): e is Extract<BattleEvent, { t: "bond" }> => e.t === "bond" && e.side === 0).map((e) => e.need);
-    award(this.registry, newTrophies(this.session.profile.trophies, { battle: { outcome, round: this.before.round, bonds }, team: after.team, boons: after.boons }));
+    award(this.registry, newTrophies(this.session.profile.trophies, { battle: { outcome, round: this.before.round, bonds }, team: after.team, boons: after.boons, ...(after.endless ? { depth: after.round } : {}) }));
     const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(800);
     this.tweens.add({ targets: dim, fillAlpha: 0.55, duration: 300 });
     const title = outcome === "win" ? "VICTORY!" : outcome === "lose" ? "DEFEAT" : "DRAW";
@@ -371,7 +371,7 @@ export class Battle extends Phaser.Scene {
     const box = panel(this, W / 2 - 250, 150, 500, 250, "ui_ancient_brown").setDepth(810).setAlpha(0);
     const head = text(this, W / 2, 196, title, 64, color, { stroke: "#2a1f1a", strokeThickness: 12 }).setOrigin(0.5).setDepth(820).setScale(0.3).setAlpha(0);
     const lines: string[] = [];
-    const boss = BOSS_ROUNDS.includes(this.before.round);
+    const boss = isBossRound(this.before.round);
     if (outcome === "win") lines.push(boss ? `${bossName(this.before.round)} is beaten!` : `Round ${this.before.round} cleared.`);
     else if (outcome === "lose") lines.push(after.lives < this.before.lives ? `You lose a life. ${after.lives} left.` : "Defeated.");
     else lines.push(after.lives < this.before.lives ? "A drawn final counts against you. You lose a life." : "Neither side prevails. No life lost.");

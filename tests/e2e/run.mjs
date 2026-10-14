@@ -339,6 +339,47 @@ await test("winning the final boss ends in a victory screen and records the resu
   await page.context().close();
 });
 
+await test("after winning, Endless mode carries on past round 12 and records the depth", async () => {
+  const page = await newPage();
+  await startRun(page, 8, "squire");
+  const giants = Array.from({ length: 5 }, (_, i) => unit(i + 1, "mammoth", 90, 900));
+  await inject(page, { round: 12, team: giants, nextUid: 20 });
+  await click(page, FIGHT);
+  await finishBattle(page);
+  await click(page, { x: 480, y: 392 });
+  await scene(page, "End");
+  await click(page, { x: 480, y: 450 }); // Endless
+  await scene(page, "Shop");
+  let r = await run(page);
+  assert.deepEqual([r.endless, r.round, r.phase], [true, 13, "shop"]);
+  await inject(page, { team: giants, nextUid: 40 });
+  await click(page, FIGHT);
+  await finishBattle(page);
+  await click(page, { x: 480, y: 392 });
+  await scene(page, "Shop");
+  r = await run(page);
+  assert.equal(r.round, 14);
+  // losing ends the run, and the depth is remembered
+  await inject(page, { lives: 1, team: team(unit(1, "squirrel", 1, 1)), nextUid: 60 });
+  await click(page, FIGHT);
+  await finishBattle(page);
+  await click(page, { x: 480, y: 392 });
+  await scene(page, "End");
+  assert.equal(await page.evaluate(() => window.__tourney.session.profile.depth.squire), 14);
+  // the saved profile has the wins from before, untouched by the Endless result
+  assert.deepEqual(await page.evaluate(() => window.__tourney.session.profile.best.squire), { round: 12, wins: 1 });
+  await page.context().close();
+});
+
+await test("hovering an enemy in the preview shows what it is", async () => {
+  const page = await newPage();
+  await startRun(page, 12);
+  await page.mouse.move(922, 112); // the first enemy portrait
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(() => window.__tourney.game.scene.getScene("Shop").hover?.kind), "enemy");
+  await page.context().close();
+});
+
 await test("continues a saved run after a reload", async () => {
   const page = await newPage("?debug&nohelp&seed=21");
   await click(page, { x: 480, y: 322 });

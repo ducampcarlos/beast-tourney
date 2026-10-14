@@ -11,6 +11,10 @@ import { type Difficulty, FACTIONS, LEVEL_EXP, type Unit } from "./types.js";
 export const MAX_ROUNDS = 12;
 export const BOSS_ROUNDS: readonly number[] = [4, 8, 12];
 
+/** Rounds beyond the twelfth only exist in Endless mode: a boss every fourth round, the three casts coming round again. */
+export const isBossRound = (round: number): boolean => BOSS_ROUNDS.includes(round) || (round > MAX_ROUNDS && round % 4 === 0);
+const bossKey = (round: number): number => (round <= MAX_ROUNDS ? round : [4, 8, 12][(round / 4 - 1) % 3]!);
+
 /** Highest shop tier on sale in a round. */
 export const tierCap = (round: number): number => Math.min(5, 1 + Math.floor((round - 1) / 2));
 
@@ -25,8 +29,11 @@ export const POWER: readonly number[] = [8, 16, 27, 44, 43, 49, 57, 77, 74, 85, 
 /** Overall multiplier on the curve, exposed so the simulator can sweep it. */
 export const TUNING = { scale: 1 };
 
-export const targetPower = (round: number, difficulty: Difficulty): number => POWER[Math.min(round, POWER.length) - 1]! * DIFFICULTY_MULT[difficulty] * TUNING.scale;
+/** Past the twelfth round the curve keeps climbing, 8% a round. */
+export const rawPower = (round: number): number => (round <= POWER.length ? POWER[round - 1]! : POWER[POWER.length - 1]! * 1.08 ** (round - POWER.length));
+export const targetPower = (round: number, difficulty: Difficulty): number => rawPower(round) * DIFFICULTY_MULT[difficulty] * TUNING.scale;
 const SIZES = [2, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5];
+const sizeFor = (round: number): number => SIZES[Math.min(round, SIZES.length) - 1]!;
 
 interface Slot {
   sp: string;
@@ -42,12 +49,14 @@ const BOSS_CASTS: Record<number, { cast: Slot[]; name: string }> = {
 };
 
 export function bossName(round: number): string | undefined {
-  return BOSS_CASTS[round]?.name;
+  if (!isBossRound(round)) return undefined;
+  const base = BOSS_CASTS[bossKey(round)]!.name;
+  return round > MAX_ROUNDS ? `${base}, Reborn` : base;
 }
 
 export function enemyTeam(seed: number, round: number, attempt: number, difficulty: Difficulty): Unit[] {
   const rng = new Rng(hashSeed(seed, round, attempt, 0xe7e));
-  const boss = BOSS_CASTS[round];
+  const boss = isBossRound(round) ? BOSS_CASTS[bossKey(round)] : undefined;
   const slots = boss ? boss.cast : generate(rng, round);
   const raw = slots.map((slot, i) => {
     const sp = species(slot.sp);
@@ -66,7 +75,7 @@ export function enemyTeam(seed: number, round: number, attempt: number, difficul
 }
 
 function generate(rng: Rng, round: number): Slot[] {
-  const size = SIZES[Math.min(round, SIZES.length) - 1]!;
+  const size = sizeFor(round);
   const cap = tierCap(round);
   const pool = SPECIES_LIST.filter((s) => s.tier <= cap);
   const theme = rng.pick(FACTIONS);
@@ -79,7 +88,7 @@ function generate(rng: Rng, round: number): Slot[] {
     const sp = rng.pick(weighted);
     let level = 1;
     if (round >= 5 && rng.chance(0.3)) level = 2;
-    if (round >= 9 && rng.chance(0.3)) level = 3;
+    if (round >= 9 && rng.chance(round > MAX_ROUNDS ? 0.7 : 0.3)) level = 3;
     const relicPool = RELICS.filter((r) => r.cost <= (round >= 10 ? 5 : 4));
     const relic = round >= 6 && rng.chance(round >= 10 ? 0.6 : 0.4) ? rng.pick(relicPool).id : undefined;
     slots.push({ sp: sp.id, level, relic });

@@ -42,7 +42,7 @@ export function parseRun(text: string): Run | null {
   if (typeof difficulty !== "string" || !(DIFFICULTIES as readonly string[]).includes(difficulty)) return null;
   const d = difficulty as Run["difficulty"];
   const { seed, round, attempt, lives, wins, gold, rng, nextUid, phase } = raw;
-  if (!isInt(seed, 0, 0xffffffff) || !isInt(round, 1, MAX_ROUNDS) || !isInt(attempt, 0, 50) || !isInt(lives, 0, LIVES.squire + 1) || !isInt(wins, 0, 200)) return null;
+  if (!isInt(seed, 0, 0xffffffff) || !isInt(round, 1, 99) || !isInt(attempt, 0, 50) || !isInt(lives, 0, LIVES.squire + 1) || !isInt(wins, 0, 200)) return null;
   if (!isInt(gold, 0, 999) || !isInt(rng, 0, 0xffffffff) || !isInt(nextUid, 1, 1_000_000)) return null;
   if (phase !== "shop" && phase !== "won" && phase !== "lost") return null;
   if (!Array.isArray(raw.team) || raw.team.length !== SLOTS) return null;
@@ -73,10 +73,10 @@ export function parseRun(text: string): Run | null {
     else return null;
   }
 
-  if (!Array.isArray(raw.history) || raw.history.length > 100) return null;
+  if (!Array.isArray(raw.history) || raw.history.length > 200) return null;
   const history = [];
   for (const h of raw.history) {
-    if (!isObj(h) || !isInt(h.round, 1, MAX_ROUNDS) || !["win", "lose", "draw"].includes(h.outcome as string) || typeof h.boss !== "boolean") return null;
+    if (!isObj(h) || !isInt(h.round, 1, 99) || !["win", "lose", "draw"].includes(h.outcome as string) || typeof h.boss !== "boolean") return null;
     history.push({ round: h.round, outcome: h.outcome as "win" | "lose" | "draw", boss: h.boss });
   }
 
@@ -91,8 +91,11 @@ export function parseRun(text: string): Run | null {
     if (!p.every((b): b is string => typeof b === "string" && hasBoon(b) && !boons.includes(b))) return null;
     pendingBoons = p;
   }
+  const endless = raw.endless ?? false;
+  if (typeof endless !== "boolean") return null;
+  if (round > MAX_ROUNDS && !endless) return null; // past the twelfth round only in Endless mode
   const freeRolls = raw.freeRolls ?? 0;
   if (!isInt(freeRolls, 0, 1)) return null;
 
-  return { v: 1, seed, difficulty: d, round, attempt, lives, wins, gold, rng, nextUid, team, offers, relics, phase, history, boons: boons as string[], pendingBoons, freeRolls };
+  return { v: 1, seed, difficulty: d, round, attempt, lives, wins, gold, rng, nextUid, team, offers, relics, phase, history, boons: boons as string[], pendingBoons, freeRolls, endless };
 }

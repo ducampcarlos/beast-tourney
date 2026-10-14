@@ -6,7 +6,7 @@
 
 import { type BattleResult, type Outcome, simulateBattle } from "./battle.js";
 import { BOONS, FACTION_DEFS, RELICS, SPECIES_LIST, bondNeed, relic as relicDef, species as speciesDef } from "./data.js";
-import { BOSS_ROUNDS, MAX_ROUNDS, enemyTeam, tierCap } from "./enemy.js";
+import { MAX_ROUNDS, enemyTeam, isBossRound, tierCap } from "./enemy.js";
 import { Rng, hashSeed } from "./rng.js";
 import { selectAllies } from "./targets.js";
 import { type Ability, type Difficulty, type Effect, FACTIONS, LEVEL_EXP, MAX_LEVEL, type RelicDef, SLOTS, type Trigger, type Unit } from "./types.js";
@@ -48,6 +48,8 @@ export interface Run {
   relics: (RelicOffer | null)[];
   phase: "shop" | "won" | "lost";
   history: RoundRecord[];
+  /** After the tournament is won: keep descending, one round after another, until the lives run out. */
+  endless: boolean;
   /** Boons won so far. */
   boons: string[];
   /** Three boons to choose from, after a boss: nothing else can be done until one is taken. */
@@ -90,7 +92,7 @@ export function newRun(seed: number, difficulty: Difficulty): Run {
   const run: Run = {
     v: 1, seed: seed >>> 0, difficulty, round: 1, attempt: 0, lives: LIVES[difficulty], wins: 0, gold: START_GOLD,
     rng: hashSeed(seed, 0x5eed), nextUid: 1, team: Array<Unit | null>(SLOTS).fill(null), offers: [], relics: [], phase: "shop", history: [],
-    boons: [], pendingBoons: null, freeRolls: 0,
+    boons: [], pendingBoons: null, freeRolls: 0, endless: false,
   };
   beginTurn(run);
   return run;
@@ -322,11 +324,11 @@ export function fight(run: Run): FightResult {
   const next = clone(run);
   const enemy = enemyTeam(next.seed, next.round, next.attempt, next.difficulty);
   const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons });
-  const boss = next.round === MAX_ROUNDS || [4, 8].includes(next.round);
+  const boss = isBossRound(next.round);
   next.history.push({ round: next.round, outcome: battle.outcome, boss });
 
   if (battle.outcome === "win") next.wins++;
-  const finalRound = next.round >= MAX_ROUNDS;
+  const finalRound = !next.endless && next.round >= MAX_ROUNDS;
   // A draw costs nothing, except in the final: it must be won.
   if (battle.outcome === "lose" || (battle.outcome === "draw" && finalRound)) next.lives--;
 
@@ -335,10 +337,13 @@ export function fight(run: Run): FightResult {
   else if (finalRound) next.attempt++;
   else next.round++;
 
-  const wonBoss = battle.outcome === "win" && BOSS_ROUNDS.includes(run.round) && run.round < MAX_ROUNDS;
+  const wonBoss = battle.outcome === "win" && isBossRound(run.round) && (run.endless || run.round < MAX_ROUNDS);
   let events: ShopEvent[] = [];
   if (next.phase === "shop") events = beginTurn(next);
-  if (wonBoss && next.phase === "shop") next.pendingBoons = offerBoons(next, run.round);
+  if (wonBoss && next.phase === "shop") {
+    const offered = offerBoons(next, run.round);
+    next.pendingBoons = offered.length > 0 ? offered : null; // nothing left to give once every boon is held
+  }
   return { ok: true, run: next, battle, enemy, events };
 }
 
@@ -346,6 +351,18 @@ export function fight(run: Run): FightResult {
 function offerBoons(run: Run, round: number): string[] {
   const rng = new Rng(hashSeed(run.seed, round, 0xb00));
   return rng.shuffle(BOONS.filter((b) => !holds(run, b.id)).map((b) => b.id)).slice(0, 3);
+}
+
+/** After winning the tournament: carry on into rounds 13 and beyond. The run is not won any more, only survived. */
+export function continueEndless(run: Run): Result {
+  if (run.phase !== "won" || run.endless) return fail("Endless mode opens only after the tournament is won.");
+  const next = clone(run);
+  next.endless = true;
+  next.phase = "shop";
+  next.round = MAX_ROUNDS + 1;
+  next.attempt = 0;
+  const events = beginTurn(next);
+  return { ok: true, run: next, events };
 }
 
 /** Take one of the offered boons. Effects that only matter once (a life, gold, a buff) land now; the rest apply from the next turn on. */

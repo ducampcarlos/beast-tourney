@@ -15,6 +15,8 @@ export interface Facts {
   battle?: { outcome: "win" | "lose" | "draw"; round: number; bonds: number[] };
   /** When a run ends. */
   end?: { won: boolean; difficulty: Difficulty; lives: number; /** Any battle was lost along the way. */ lost: boolean };
+  /** In Endless mode: the round now reached. */
+  depth?: number;
   /** Species met so far, for the Bestiary. */
   seen?: number;
 }
@@ -44,6 +46,8 @@ export const TROPHIES: TrophyDef[] = [
   { id: "champion-crown", name: "Champion's Crown", text: "Win the tournament on Champion.", test: (f) => f.end?.won === true && f.end.difficulty === "champion" },
   { id: "untouched", name: "Untouched", text: "Win the tournament without losing a life.", test: (f) => f.end?.won === true && !f.end.lost },
   { id: "by-a-thread", name: "By a Thread", text: "Win the tournament with one life left.", test: (f) => f.end?.won === true && f.end.lives === 1 },
+  { id: "into-the-depths", name: "Into the Depths", text: "Reach round 16 in Endless mode.", test: (f) => (f.depth ?? 0) >= 16 },
+  { id: "abyss-walker", name: "Abyss Walker", text: "Reach round 24 in Endless mode.", test: (f) => (f.depth ?? 0) >= 24 },
   { id: "naturalist", name: "Naturalist", text: "Meet every creature in the Bestiary.", test: (f) => (f.seen ?? 0) >= SPECIES_LIST.length },
 ];
 

@@ -18,6 +18,8 @@ export interface Profile {
   seen: string[];
   /** Highest round reached and runs won, per difficulty. */
   best: Record<Difficulty, { round: number; wins: number }>;
+  /** Deepest round reached in Endless mode, per rank. */
+  depth: Record<Difficulty, number>;
   muted: boolean;
   musicVolume: number;
   sfxVolume: number;
@@ -31,6 +33,7 @@ export interface Profile {
 const emptyProfile = (): Profile => ({
   seen: [],
   best: { squire: { round: 0, wins: 0 }, knight: { round: 0, wins: 0 }, champion: { round: 0, wins: 0 } },
+  depth: { squire: 0, knight: 0, champion: 0 },
   muted: false,
   musicVolume: 0.5,
   sfxVolume: 0.8,
@@ -66,6 +69,10 @@ export function parseProfile(text: string | null): Profile {
     for (const d of DIFFICULTIES) {
       const b = raw.best?.[d];
       if (b && Number.isInteger(b.round) && Number.isInteger(b.wins) && b.round >= 0 && b.round <= 12 && b.wins >= 0 && b.wins < 1e6) base.best[d] = { round: b.round, wins: b.wins };
+    }
+    for (const d of DIFFICULTIES) {
+      const v = raw.depth?.[d];
+      if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 1000) base.depth[d] = v;
     }
     if (typeof raw.muted === "boolean") base.muted = raw.muted;
     if (typeof raw.musicVolume === "number" && raw.musicVolume >= 0 && raw.musicVolume <= 1) base.musicVolume = raw.musicVolume;
@@ -115,9 +122,14 @@ export class Session {
   finish(): void {
     const run = this.run;
     if (!run) return;
-    const best = this.profile.best[run.difficulty];
-    const reached = run.phase === "won" ? 12 : run.round;
-    this.profile.best[run.difficulty] = { round: Math.max(best.round, reached), wins: best.wins + (run.phase === "won" ? 1 : 0) };
+    if (run.endless) {
+      // the tournament itself was won before; only the depth is new
+      this.profile.depth[run.difficulty] = Math.max(this.profile.depth[run.difficulty], run.round);
+    } else {
+      const best = this.profile.best[run.difficulty];
+      const reached = run.phase === "won" ? 12 : run.round;
+      this.profile.best[run.difficulty] = { round: Math.max(best.round, reached), wins: best.wins + (run.phase === "won" ? 1 : 0) };
+    }
     write(RUN_KEY, null);
     this.saveProfile();
   }
