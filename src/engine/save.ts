@@ -8,6 +8,7 @@ import { hasBoon, hasOath, hasRelic, hasSpecies, species } from "./data.js";
 import { LIVES, type Run } from "./run.js";
 import { DIFFICULTIES, LEVEL_EXP, MAX_LEVEL, SLOTS, type Unit } from "./types.js";
 import { MAX_ROUNDS } from "./enemy.js";
+import { validTree } from "./skills.js";
 
 export const SAVE_VERSION = 1;
 
@@ -97,8 +98,10 @@ export function parseRun(text: string): Run | null {
   const oaths = raw.oaths ?? []; // saves from before oaths existed took none
   if (!Array.isArray(oaths) || oaths.length > 5 || new Set(oaths).size !== oaths.length) return null;
   if (!oaths.every((o): o is string => typeof o === "string" && hasOath(o))) return null;
+  const perks = raw.perks ?? []; // saves from before the skill tree had none
+  if (!Array.isArray(perks) || perks.length > 12 || !perks.every((p): p is string => typeof p === "string") || !validTree(perks)) return null;
   const freeRolls = raw.freeRolls ?? 0;
   if (!isInt(freeRolls, 0, 1)) return null;
 
-  return { v: 1, seed, difficulty: d, round, attempt, lives, wins, gold, rng, nextUid, team, offers, relics, phase, history, boons: boons as string[], pendingBoons, freeRolls, endless, oaths: oaths as string[] };
+  return { v: 1, seed, difficulty: d, round, attempt, lives, wins, gold, rng, nextUid, team, offers, relics, phase, history, boons: boons as string[], pendingBoons, freeRolls, endless, oaths: oaths as string[], perks };
 }

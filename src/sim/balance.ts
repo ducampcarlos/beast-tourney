@@ -8,6 +8,7 @@
 import { SPECIES_LIST } from "../engine/data.js";
 import { TUNING } from "../engine/enemy.js";
 import { newRun } from "../engine/run.js";
+import { SKILLS } from "../engine/skills.js";
 import { DIFFICULTIES } from "../engine/types.js";
 import { type Skill, playRun } from "./bots.js";
 
@@ -16,8 +17,10 @@ const skill = (process.argv[3] ?? "greedy") as Skill;
 if (process.argv[4]) TUNING.scale = Number(process.argv[4]);
 /** OATHS=pauper,glass npm run balance: play every run under these oaths. */
 const oaths = (process.env.OATHS ?? "").split(",").filter(Boolean);
+/** PERKS=all (or a list of skill ids) plays every run with those skills from the tree. */
+const perks = process.env.PERKS === "all" ? SKILLS.map((k) => k.id) : (process.env.PERKS ?? "").split(",").filter(Boolean);
 
-console.log(`Balance report: ${n} runs per difficulty, ${skill} bot, enemy power x${TUNING.scale}${oaths.length ? `, oaths: ${oaths.join(", ")}` : ""}\n`);
+console.log(`Balance report: ${n} runs per difficulty, ${skill} bot, enemy power x${TUNING.scale}${oaths.length ? `, oaths: ${oaths.join(", ")}` : ""}${perks.length ? `, skills: ${perks.length}` : ""}\n`);
 for (const difficulty of DIFFICULTIES) {
   let wins = 0;
   const reached = new Map<number, number>();
@@ -25,7 +28,7 @@ for (const difficulty of DIFFICULTIES) {
   const byRound = new Map<number, { w: number; l: number; d: number }>();
   const power = new Map<number, { me: number; foe: number; n: number }>();
   for (let seed = 1; seed <= n; seed++) {
-    const { log, run } = playRun(newRun(seed * 7919, difficulty, oaths), skill);
+    const { log, run } = playRun(newRun(seed * 7919, difficulty, oaths, perks), skill);
     if (log.won) wins++;
     reached.set(run.round, (reached.get(run.round) ?? 0) + 1);
     for (const f of log.fights) {

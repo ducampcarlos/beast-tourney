@@ -31,7 +31,7 @@ function banner(scene: Phaser.Scene, id: string): void {
   audio.sfx("levelup", 0.7, 1.1);
   const box = panel(scene, W / 2 - 220, -90, 440, 76, "ui_ancient_tan").setDepth(3000);
   const star = scene.add.image(W / 2 - 190, -52, "star").setScale(3.4).setDepth(3001);
-  const head = text(scene, W / 2 - 160, -84, "Trophy unlocked", 16, "#6b4a2f").setDepth(3001);
+  const head = text(scene, W / 2 - 160, -84, `Challenge complete  ·  +${def.points} skill point${def.points === 1 ? "" : "s"}`, 16, "#6b4a2f").setDepth(3001);
   const name = text(scene, W / 2 - 160, -62, def.name, 26, COLOR.dark).setDepth(3001);
   const parts = [box, star, head, name];
   const drop = 100;

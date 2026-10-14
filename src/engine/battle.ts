@@ -82,10 +82,12 @@ export interface BattleOptions {
   boons?: readonly string[];
   /** Oaths the player took; some of them change how the player's creatures fight. */
   oaths?: readonly string[];
+  /** Skills from the skill tree the run started with. */
+  perks?: readonly string[];
 }
 
 export function simulateBattle(player: readonly Unit[], enemy: readonly Unit[], seed: number, options: BattleOptions = {}): BattleResult {
-  return new Battle(player, enemy, seed, options.boons ?? [], options.oaths ?? []).run();
+  return new Battle(player, enemy, seed, options.boons ?? [], options.oaths ?? [], options.perks ?? []).run();
 }
 
 class Battle {
@@ -100,7 +102,7 @@ class Battle {
   private nextUid = SUMMON_UID_BASE;
   private clashes = 0;
 
-  constructor(player: readonly Unit[], enemy: readonly Unit[], seed: number, private readonly boons: readonly string[], private readonly oaths: readonly string[]) {
+  constructor(player: readonly Unit[], enemy: readonly Unit[], seed: number, private readonly boons: readonly string[], private readonly oaths: readonly string[], private readonly perks: readonly string[]) {
     this.rng = new Rng(seed);
     this.teams = [player.slice(0, SLOTS).map((u) => this.make(u, 0, 0)), enemy.slice(0, SLOTS).map((u) => this.make(u, 1, ENEMY_UID_BASE))];
   }
@@ -287,6 +289,10 @@ class Battle {
   private applyBoons(): void {
     const team = this.teams[0];
     if (team.length === 0) return;
+    if (this.perks.includes("tough")) this.apply(team[0]!, { kind: "buff", to: "self", hp: 1 }, undefined, 1);
+    if (this.perks.includes("sharp")) this.apply(team[0]!, { kind: "buff", to: "random", atk: 1 }, undefined, 1);
+    if (this.perks.includes("front-guard")) this.apply(team[0]!, { kind: "buff", to: "self", atk: 1 }, undefined, 1);
+    if (this.perks.includes("last-stand")) this.boonRevive = Math.max(this.boonRevive, 0.3);
     if (this.oaths.includes("glass")) {
       for (const u of team) {
         u.atk += 2;

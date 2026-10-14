@@ -5,6 +5,7 @@
  */
 
 import { type BattleResult, type Outcome, simulateBattle } from "./battle.js";
+import { hasSkill } from "./skills.js";
 import { BOONS, FACTION_DEFS, RELICS, SPECIES_LIST, bondNeed, hasOath, relic as relicDef, species as speciesDef } from "./data.js";
 import { MAX_ROUNDS, enemyTeam, isBossRound, tierCap } from "./enemy.js";
 import { Rng, hashSeed } from "./rng.js";
@@ -58,6 +59,8 @@ export interface Run {
   freeRolls: number;
   /** Optional vows taken before the run: each makes it harder. */
   oaths: string[];
+  /** Skills from the skill tree that the run started with. */
+  perks: string[];
 }
 
 export type ShopEvent =
@@ -72,14 +75,15 @@ export type Result = { ok: true; run: Run; events: ShopEvent[] } | { ok: false; 
 const fail = (error: string): Result => ({ ok: false, error });
 const clone = (run: Run): Run => structuredClone(run);
 const holds = (run: Run, id: string): boolean => run.boons.includes(id);
+const perk = (run: Run, id: string): boolean => run.perks.includes(id);
 const blocked = (run: Run): Result | null => (run.phase !== "shop" ? fail("The run is over.") : run.pendingBoons ? fail("Choose your reward first.") : null);
 
 // What a boon changes in the shop, in one place so the UI shows the same numbers the rules use.
-export const offerSlots = (run: Run): number => Math.min(5, offerCount(run.round) + (holds(run, "market") ? 1 : 0));
-export const shopTier = (run: Run): number => Math.min(5, tierCap(run.round) + (holds(run, "scholar") ? 1 : 0));
-export const relicCost = (run: Run, def: RelicDef): number => Math.max(2, def.cost - (holds(run, "haggler") ? 1 : 0));
+export const offerSlots = (run: Run): number => Math.min(5, offerCount(run.round) + (holds(run, "market") ? 1 : 0) + (perk(run, "early-bird") && run.round <= 2 ? 1 : 0));
+export const shopTier = (run: Run): number => Math.min(5, tierCap(run.round) + (holds(run, "scholar") ? 1 : 0) + (perk(run, "scholar-eye") && run.round >= 8 ? 1 : 0));
+export const relicCost = (run: Run, def: RelicDef): number => Math.max(2, def.cost - (holds(run, "haggler") ? 1 : 0) - (perk(run, "haggle") ? 1 : 0));
 export const rollCost = (run: Run): number => (run.freeRolls > 0 ? 0 : ROLL_COST);
-export const sellGold = (run: Run, unit: Unit): number => unit.level + (holds(run, "thrift") ? 1 : 0);
+export const sellGold = (run: Run, unit: Unit): number => unit.level + (holds(run, "thrift") ? 1 : 0) + (perk(run, "thrifty") && speciesDef(unit.sp).tier >= 2 ? 1 : 0);
 
 export const offerCount = (round: number): number => (round <= 2 ? 3 : round <= 6 ? 4 : 5);
 export const relicOfferCount = (round: number): number => (round >= 2 ? 2 : 0);
@@ -90,11 +94,12 @@ export function newUnit(run: Run, spId: string): Unit {
   return { uid: run.nextUid++, sp: sp.id, atk: sp.atk, hp: sp.hp, level: 1, exp: 0 };
 }
 
-export function newRun(seed: number, difficulty: Difficulty, oaths: readonly string[] = []): Run {
+export function newRun(seed: number, difficulty: Difficulty, oaths: readonly string[] = [], perks: readonly string[] = []): Run {
+  const kept = [...new Set(perks)].filter(hasSkill);
   const run: Run = {
-    v: 1, seed: seed >>> 0, difficulty, round: 1, attempt: 0, lives: Math.max(1, LIVES[difficulty] - (oaths.includes("fragile") ? 1 : 0)), wins: 0, gold: START_GOLD,
+    v: 1, seed: seed >>> 0, difficulty, round: 1, attempt: 0, lives: Math.max(1, LIVES[difficulty] - (oaths.includes("fragile") ? 1 : 0) + (kept.includes("second-chance") ? 1 : 0)), wins: 0, gold: START_GOLD,
     rng: hashSeed(seed, 0x5eed), nextUid: 1, team: Array<Unit | null>(SLOTS).fill(null), offers: [], relics: [], phase: "shop", history: [],
-    boons: [], pendingBoons: null, freeRolls: 0, endless: false, oaths: [...new Set(oaths)].filter(hasOath),
+    boons: [], pendingBoons: null, freeRolls: 0, endless: false, oaths: [...new Set(oaths)].filter(hasOath), perks: kept,
   };
   beginTurn(run);
   return run;
@@ -140,16 +145,21 @@ function turnEffects(run: Run): ShopEvent[] {
   }
   for (const unit of run.team) if (unit) fireShop(run, unit, "turnStart", false, run.team.indexOf(unit), events);
   if (holds(run, "mentor")) mentorBuff(run, events);
+  if (perk(run, "apprentice") && run.round % 3 === 0) mentorBuff(run, events, 1);
   return events;
 }
 
-/** Veteran's Banner: the weakest creature, front first on ties, gains +2/+2. */
-function mentorBuff(run: Run, events: ShopEvent[]): void {
+/** Some skills only start to help later in a run. */
+const LATE_PERKS = new Set<string>();
+export const perkActive = (id: string, round: number): boolean => !LATE_PERKS.has(id) || round >= 5;
+
+/** Veteran's Banner: the weakest creature, front first on ties, gains +2/+2 (Apprentice's Care: +1/+1). */
+function mentorBuff(run: Run, events: ShopEvent[], amount = 2): void {
   const weakest = run.team.filter((u): u is Unit => u !== null).sort((a, b) => a.atk + a.hp - (b.atk + b.hp))[0];
   if (!weakest) return;
-  weakest.atk += 2;
-  weakest.hp += 2;
-  events.push({ t: "buff", uid: weakest.uid, atk: 2, hp: 2 });
+  weakest.atk += amount;
+  weakest.hp += amount;
+  events.push({ t: "buff", uid: weakest.uid, atk: amount, hp: amount });
 }
 
 function beginTurn(run: Run): ShopEvent[] {
@@ -158,8 +168,10 @@ function beginTurn(run: Run): ShopEvent[] {
   run.gold =
     START_GOLD + (holds(run, "purse") ? 2 : 0) - (run.oaths.includes("pauper") ? 1 : 0) +
     (holds(run, "spoils") && won ? 2 : 0) +
+    (perk(run, "lucky-start") && run.round <= 6 && run.attempt === 0 ? 1 : 0) +
+    (perk(run, "keen-eye") && run.round >= 7 ? 1 : 0) +
     (holds(run, "interest") ? Math.min(3, Math.floor(unspent / 3)) : 0);
-  run.freeRolls = holds(run, "lucky") ? 1 : 0;
+  run.freeRolls = holds(run, "lucky") || perk(run, "keen-eye") ? 1 : 0;
   const events = turnEffects(run);
   stock(run, new Rng(run.rng));
   // stock() consumed numbers from a copy; advance the stored state deterministically
@@ -330,7 +342,7 @@ export function fight(run: Run): FightResult {
   if (mine.length === 0) return { ok: false, error: "Field at least one creature." };
   const next = clone(run);
   const enemy = enemyTeam(next.seed, next.round, next.attempt, next.difficulty, next.oaths);
-  const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons, oaths: next.oaths });
+  const battle = simulateBattle(mine, enemy, hashSeed(next.seed, next.round, next.attempt, 0xba77), { boons: next.boons, oaths: next.oaths, perks: next.perks.filter((p) => perkActive(p, next.round)) });
   const boss = isBossRound(next.round);
   next.history.push({ round: next.round, outcome: battle.outcome, boss });
 

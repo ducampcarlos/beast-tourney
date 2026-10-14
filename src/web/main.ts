@@ -9,6 +9,7 @@ import { End } from "./end.js";
 import { Menu } from "./menu.js";
 import { Session } from "./session.js";
 import { Shop } from "./shop.js";
+import { Skills } from "./skills.js";
 import { Trophies } from "./trophies.js";
 import { H, W } from "./ui.js";
 
@@ -25,7 +26,7 @@ const game = new Phaser.Game({
   antialias: false,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 2 },
-  scene: [Boot, Menu, Shop, Battle, Boon, End, Bestiary, Trophies],
+  scene: [Boot, Menu, Shop, Battle, Boon, End, Bestiary, Trophies, Skills],
   banner: false,
 });
 

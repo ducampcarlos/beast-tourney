@@ -6,6 +6,7 @@ export const HELP_LINES = [
   "Then your team fights on its own, front against front. Abilities trigger at the start of battle, when hurt, on a kill, on fainting and more. Hover a creature to read what it does.",
   "Bonds: field 2 or 4 different kinds of the same faction for a team-wide bonus. Relics go on one creature each. Freeze (the padlock) keeps an offer for next turn.",
   "Win rounds, beat the bosses on rounds 4, 8 and 12, and be the last one standing. Every defeat costs a life. Keys: R rolls, F fights.",
+  "Challenges give skill points, and the Skill Tree in the menu turns them into permanent upgrades. Oaths make a run harder on purpose. The Daily Run takes neither.",
 ];
 
 export const CREDITS_LINES = [

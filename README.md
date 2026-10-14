@@ -22,15 +22,18 @@ Each turn you get 10 gold. Spend it in the shop, then press **Fight**: the two t
 - **Fight.** Abilities fire at battle start, when hurt, on a kill, on fainting, when an ally faints, and, in the shop, on sell and at the start of a turn. A **barrier** cancels the next hit; **venom** makes a creature's attacks lethal.
 - **Choose a boon.** Beat the bosses of rounds 4 and 8 and pick one of three rewards for the rest of the run: a heavy purse, a free reroll, a shop that sells a tier higher, bonds that need one creature fewer, a barrier for your front line, a phoenix ember, a crest for your front creature, interest on unspent gold... Fifteen in all, and they change what a run is about.
 - **Swear an oath.** Before a run you can take vows that make it harder in different ways: a gold less every turn, no relics for sale, glass-cannon creatures (+2 attack, -2 health), opponents 10% stronger, one life fewer. Stack them as you like; winning under three at once earns a trophy of its own.
+- **Grow.** Every **challenge** (the old trophies: win a battle, field a four-creature bond, win on Champion, reach round 24 in Endless...) gives skill points. Spend them in the **Skill Tree**: three branches of four permanent upgrades (Fortune for gold and the shop, Might for battle, Wisdom for growth and lives), each needing the one before it. The tree costs more than a few challenges pay, so the order is a choice, and **Respec** gives every point back for free. The Daily Run ignores the tree, so it stays the same for everybody.
 - **Survive.** Beat the Goblin King, the Lich Lord and the Elder Dragon, and lose no more lives than your rank allows. Then, if you dare, **descend**: Endless mode keeps the round counter going, the enemies growing 8% stronger each round and the three bosses coming back *Reborn*.
 
 <p align="center"><img src="assets/boons.png" alt="Choosing a boon after a boss" width="390"> <img src="assets/boss.png" alt="The Lich Lord, a boss, towering over its escort" width="390"></p>
 
-**Everything else:** 65 creatures with flavour text and three levels each; a **Bestiary** that fills in as you meet them, with every faction's bonds; 21 **trophies** and a **run history** that remembers your teams; three ranks (Squire, Knight, Champion); a **Daily Run** with the same seed for everybody; saves you can resume after closing the tab; hover any enemy to see what you are about to fight, and any creature in battle to read its ability and status; a **result you can copy and share** (a verdict and one coloured square per round); an announcement when the shop reaches a new tier; speed control and skip in battle; settings for music, effects, default speed and screen shake; and a layout that fits any screen. It can be **installed** like an app and **plays offline** after the first visit.
+**Everything else:** 65 creatures with flavour text and three levels each; a **Bestiary** that fills in as you meet them, with every faction's bonds; 27 **challenges** and a **run history** that remembers your teams; three ranks (Squire, Knight, Champion); a **Daily Run** with the same seed for everybody; saves you can resume after closing the tab; hover any enemy to see what you are about to fight, and any creature in battle to read its ability and status; a **result you can copy and share** (a verdict and one coloured square per round); an announcement when the shop reaches a new tier; speed control and skip in battle; settings for music, effects, default speed and screen shake; and a layout that fits any screen. It can be **installed** like an app and **plays offline** after the first visit.
 
 <p align="center"><img src="assets/oaths.png" alt="The oaths panel, with three vows sworn" width="390"> <img src="assets/menu.png" alt="The menu" width="390"></p>
 
-<p align="center"><img src="assets/trophies.png" alt="The trophies" width="390"> <img src="assets/runs.png" alt="The run history, each run with the team that finished it" width="390"></p>
+<p align="center"><img src="assets/skills.png" alt="The skill tree, with some points spent" width="390"> <img src="assets/trophies.png" alt="The challenges and the points they give" width="390"></p>
+
+<p align="center"><img src="assets/runs.png" alt="The run history, each run with the team that finished it" width="390"></p>
 
 | Controls | |
 | --- | --- |
@@ -59,6 +62,7 @@ npm run dev        # builds, watches and serves http://localhost:8000
 ```
 src/engine/   the rules: pure TypeScript, no Phaser, no DOM, no clock
   data.ts       65 creatures, 7 factions with their bonds, 16 relics, 15 boons, 5 oaths, bosses
+  skills.ts     the skill tree: 12 skills in 3 branches, bought with the points of the challenges
   battle.ts     the fight: effects, triggers, statuses, bonds, boons, revival; returns an event log
   run.ts        the shop, merging, gold, boons, the ladder and Endless mode; every command returns a new state
   enemy.ts      opponents, generated from the seed and scaled to a power curve
@@ -78,11 +82,11 @@ docs/         the site GitHub Pages serves: index.html, assets, the built game.j
 ## Tests
 
 ```bash
-npm test            # 172 tests: rules, shop, boons, Endless, enemies, trophies, saves, content, bots, balance bands
-npm run test:e2e    # 40 end-to-end tests in a real Chromium (needs: npm run build)
+npm test            # 196 tests: rules, shop, boons, Endless, enemies, trophies, saves, content, bots, balance bands
+npm run test:e2e    # 41 end-to-end tests in a real Chromium (needs: npm run build)
 ```
 
-The unit tests cover every ability trigger and effect, each status, each bond, each of the fifteen boons, each oath, merging and levelling, selling, freezing, relics, the whole ladder (including losing the final and drawing), Endless mode, determinism, and save tampering (dozens of kinds of impossible values are refused, and saves from before a feature existed still load). A fuzz test throws up to 6,000 random commands at the shop and 1,500 random fights at the battle engine and checks the invariants hold. The end-to-end tests drive the real built game with a real mouse and a real finger: dragging to buy, merge, sell and equip, undo, double-tap, a battle played in real time, a lost run, a won tournament, Endless mode, choosing boons, resuming after a reload, a corrupted save, the settings, trophies, a canvas from phone to 1080p, going offline after the first visit, and a "monkey" that clicks, drags and types at random for hundreds of actions without a single error. Writing them found real bugs, among them a second boon that could not be taken because a scene kept its state between visits.
+The unit tests cover every ability trigger and effect, each status, each bond, each of the fifteen boons, each oath, each of the twelve skills, merging and levelling, selling, freezing, relics, the whole ladder (including losing the final and drawing), Endless mode, determinism, and save tampering (dozens of kinds of impossible values are refused, and saves from before a feature existed still load). A fuzz test throws up to 6,000 random commands at the shop and 1,500 random fights at the battle engine and checks the invariants hold. The end-to-end tests drive the real built game with a real mouse and a real finger: dragging to buy, merge, sell and equip, undo, double-tap, a battle played in real time, a lost run, a won tournament, Endless mode, choosing boons, resuming after a reload, a corrupted save, the settings, trophies, a canvas from phone to 1080p, going offline after the first visit, and a "monkey" that clicks, drags and types at random for hundreds of actions without a single error. Writing them found real bugs, among them a second boon that could not be taken because a scene kept its state between visits.
 
 ## Limitations
 

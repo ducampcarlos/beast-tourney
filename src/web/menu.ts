@@ -6,8 +6,10 @@ import type { Audio } from "./audio.js";
 import { CreatureView } from "./creature.js";
 import type { Session } from "./session.js";
 import { HELP_LINES } from "./help.js";
+import { newTrophies } from "../engine/achievements.js";
 import { openOaths } from "./oaths.js";
 import { openSettings } from "./settings.js";
+import { award } from "./toasts.js";
 import { COLOR, H, W, backdrop, button, fadeIn, go, overlay, panel, text, type Button } from "./ui.js";
 
 const BLURB: Record<Difficulty, string> = {
@@ -63,10 +65,13 @@ export class Menu extends Phaser.Scene {
       const r = session.run!;
       button(this, W / 2, 376, `Continue (round ${r.round}, ${r.lives} lives)`, () => go(this, "Shop"), { w: 400, h: 44, color: "yellow", size: 20 });
     } else {
-      button(this, W / 2, 376, "Daily Run", () => this.begin(session, dailySeed(), "knight", []), { w: 280, h: 44, color: "blue", size: 22 });
+      // the Daily Run is the same for everyone: no oaths, no skills
+      button(this, W / 2, 376, "Daily Run", () => this.begin(session, dailySeed(), "knight", [], []), { w: 280, h: 44, color: "blue", size: 22 });
     }
-    button(this, W / 2 - 100, 424, "Bestiary", () => go(this, "Bestiary"), { w: 190, h: 40, color: "blue", size: 20 });
-    button(this, W / 2 + 100, 424, "Trophies", () => go(this, "Trophies"), { w: 190, h: 40, color: "blue", size: 20 });
+    button(this, W / 2 - 148, 424, "Bestiary", () => go(this, "Bestiary"), { w: 136, h: 40, color: "blue", size: 19 });
+    button(this, W / 2, 424, "Challenges", () => go(this, "Trophies"), { w: 150, h: 40, color: "blue", size: 19 });
+    const points = session.points();
+    button(this, W / 2 + 148, 424, points > 0 ? `Skills (${points})` : "Skills", () => go(this, "Skills"), { w: 136, h: 40, color: points > 0 ? "yellow" : "blue", size: 19 });
     button(this, W / 2 - 100, 470, "How to play", () => overlay(this, "How to play", HELP_LINES), { w: 190, h: 40, color: "grey", size: 20 });
     button(this, W / 2 + 100, 470, "Settings", () => openSettings(this), { w: 190, h: 40, color: "grey", size: 20 });
 
@@ -101,8 +106,10 @@ export class Menu extends Phaser.Scene {
     if (sound) (this.registry.get("audio") as Audio).sfx("select", 0.4);
   }
 
-  private begin(session: Session, seed?: number, difficulty: Difficulty = this.difficulty, oaths: readonly string[] = this.oaths): void {
-    session.start(difficulty, seed, oaths); // the Daily Run is the same for everyone, so it takes none
+  private begin(session: Session, seed?: number, difficulty: Difficulty = this.difficulty, oaths: readonly string[] = this.oaths, perks: readonly string[] = session.profile.skills): void {
+    session.start(difficulty, seed, oaths, perks);
+    // the "seasoned" challenges are about how many runs have been started
+    award(this.registry, newTrophies(session.profile.trophies, { runs: session.profile.runs }));
     go(this, "Shop");
   }
 

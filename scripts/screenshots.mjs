@@ -110,6 +110,11 @@ const go = (page, key, data) => page.evaluate(({ key, data }) => window.__tourne
   await page.evaluate(() => window.__tourney.game.scene.getScene("Trophies").show("runs", window.__tourney.session));
   await page.waitForTimeout(300);
   await shot(page, "runs");
+  // the skill tree, with some of the points spent
+  await page.evaluate(() => ["lucky-start", "haggle", "thrifty", "tough"].forEach((id) => window.__tourney.session.learn(id)));
+  await go(page, "Skills");
+  await page.waitForTimeout(900);
+  await shot(page, "skills");
   await context.close();
 }
 

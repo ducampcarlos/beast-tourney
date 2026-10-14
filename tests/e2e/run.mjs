@@ -439,6 +439,52 @@ await test("oaths are sworn from the menu and shape the run", async () => {
   await page.context().close();
 });
 
+await test("challenges give points that buy skills in the tree, and the skills shape the next run", async () => {
+  const page = await newPage("?debug&nohelp&seed=5");
+  // 1 + 1 + 2 points from three challenges
+  await page.evaluate(() => {
+    const { session } = window.__tourney;
+    session.profile.trophies = ["first-blood", "growing-up", "fully-grown"];
+    session.saveProfile();
+  });
+  await page.reload();
+  await scene(page, "Menu");
+  await click(page, { x: 628, y: 424 }); // Skills (4)
+  await scene(page, "Skills");
+  const profile = () => page.evaluate(() => ({ skills: window.__tourney.session.profile.skills, points: window.__tourney.session.points() }));
+  assert.deepEqual(await profile(), { skills: [], points: 4 });
+  await click(page, { x: 172, y: 191 }); // Lucky Start, 2 points
+  assert.deepEqual(await profile(), { skills: ["lucky-start"], points: 2 });
+  await click(page, { x: 172, y: 279 }); // Sharp Haggler costs 4: refused
+  assert.deepEqual(await profile(), { skills: ["lucky-start"], points: 2 });
+  await click(page, { x: 172, y: 455 }); // Keen Eye: its requirements are missing: refused
+  await click(page, { x: 484, y: 279 }); // Sharpened needs Toughened: refused
+  assert.deepEqual(await profile(), { skills: ["lucky-start"], points: 2 });
+  await click(page, { x: 484, y: 191 }); // Toughened, 2 points
+  assert.deepEqual(await profile(), { skills: ["lucky-start", "tough"], points: 0 });
+  await click(page, { x: 700, y: 27 }); // Respec gives everything back
+  assert.deepEqual(await profile(), { skills: [], points: 4 });
+  await click(page, { x: 172, y: 191 });
+  // the choice survives a reload, and the next run starts with it
+  await page.reload();
+  await scene(page, "Menu");
+  assert.deepEqual(await profile(), { skills: ["lucky-start"], points: 2 });
+  await click(page, { x: 418, y: 322 }); // New Run
+  await scene(page, "Shop");
+  let r = await run(page);
+  assert.deepEqual([r.perks, r.gold], [["lucky-start"], 11]);
+  // the Daily Run is the same for everyone: it takes no skills
+  await page.evaluate(() => window.__tourney.session.abandon());
+  await page.evaluate(() => window.__tourney.game.scene.getScenes(true)[0].scene.start("Menu"));
+  await scene(page, "Menu");
+  await page.waitForTimeout(400);
+  await click(page, { x: 480, y: 376 }); // Daily Run
+  await scene(page, "Shop");
+  r = await run(page);
+  assert.deepEqual([r.perks, r.gold], [[], 10]);
+  await page.context().close();
+});
+
 await test("continues a saved run after a reload", async () => {
   const page = await newPage("?debug&nohelp&seed=21");
   await click(page, { x: 480, y: 322 });
@@ -679,7 +725,7 @@ await test("trophies are earned in play, saved, and listed", async () => {
   assert.ok(owned.includes("first-blood"), `trophies: ${owned}`);
   await page.reload();
   await scene(page, "Menu");
-  await click(page, { x: 580, y: 424 }); // Trophies
+  await click(page, { x: 480, y: 424 }); // Challenges
   await scene(page, "Trophies");
   assert.ok((await page.evaluate(() => window.__tourney.session.profile.trophies)).includes("first-blood"));
   await click(page, { x: 492, y: 27 }); // the run history tab

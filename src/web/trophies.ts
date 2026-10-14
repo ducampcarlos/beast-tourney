@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import { TROPHIES } from "../engine/achievements.js";
+import { TROPHIES, pointsEarned } from "../engine/achievements.js";
 import { species } from "../engine/data.js";
 import type { Audio } from "./audio.js";
 import type { Session } from "./session.js";
@@ -23,7 +23,7 @@ export class Trophies extends Phaser.Scene {
     panel(this, 0, 0, W, 54, "ui_ancient_brown");
     text(this, 18, 26, "Records", 30, COLOR.gold, { stroke: "#2a1f1a", strokeThickness: 6 }).setOrigin(0, 0.5);
     this.tabs = {
-      trophies: button(this, 330, 27, "Trophies", () => this.show("trophies", session), { w: 150, h: 38, color: "blue", size: 20 }),
+      trophies: button(this, 330, 27, "Challenges", () => this.show("trophies", session), { w: 160, h: 38, color: "blue", size: 20 }),
       runs: button(this, 492, 27, "Run history", () => this.show("runs", session), { w: 160, h: 38, color: "blue", size: 20 }),
     };
     button(this, 880, 27, "Back", () => go(this, "Menu"), { w: 130, h: 40, color: "grey", size: 20 });
@@ -47,23 +47,25 @@ export class Trophies extends Phaser.Scene {
 
   private drawTrophies(session: Session): void {
     const owned = session.profile.trophies;
-    this.keep(text(this, 600, 27, `${owned.length} of ${TROPHIES.length}`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
-    // two columns; the rows squeeze together as trophies are added, so the list always fits the panel
-    const rows = Math.ceil(TROPHIES.length / 2);
+    this.keep(text(this, 600, 27, `${owned.length} of ${TROPHIES.length}  ·  ${pointsEarned(owned)} points`, 22, COLOR.cream, { stroke: "#2a1f1a", strokeThickness: 5 }).setOrigin(0, 0.5));
+    // three columns of cards that always fit the panel, however many challenges there are
+    const cols = 3;
+    const rows = Math.ceil(TROPHIES.length / cols);
     const pitch = Math.min(49, Math.floor(448 / rows));
     const height = pitch - 5;
-    const roomy = pitch >= 46;
+    const width = 296;
     TROPHIES.forEach((t, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const x = 32 + col * 468;
+      const col = Math.floor(i / rows);
+      const row = i % rows;
+      const x = 24 + col * (width + 8);
       const y = 76 + row * pitch;
       const got = owned.includes(t.id);
-      this.keep(this.rect(x + 216, y + height / 2, 440, height, got ? 0x4a3a22 : 0x2f2418, got ? 0xf2c14e : 0x4a3a2a));
-      const star = this.image(x + 26, y + height / 2, "star", roomy ? 3 : 2.5);
+      this.keep(this.rect(x + width / 2, y + height / 2, width, height, got ? 0x4a3a22 : 0x2f2418, got ? 0xf2c14e : 0x4a3a2a));
+      const star = this.image(x + 22, y + height / 2, "star", 2.6);
       if (!got) star.setTintFill(0x1a1410).setAlpha(0.8);
-      this.keep(text(this, x + 56, y + (roomy ? 4 : 2), got ? t.name : "???", roomy ? 21 : 19, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
-      this.keep(text(this, x + 56, y + (roomy ? 25 : 21), t.text, roomy ? 14 : 13, got ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2 }));
+      this.keep(text(this, x + 44, y + 2, got ? t.name : "???", 18, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }));
+      this.keep(text(this, x + width - 10, y + 3, `+${t.points}`, 18, got ? COLOR.gold : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 3 }).setOrigin(1, 0));
+      this.keep(text(this, x + 44, y + 22, t.text, 12, got ? COLOR.cream : COLOR.muted, { stroke: "#2a1f1a", strokeThickness: 2, wordWrap: { width: width - 54 }, lineSpacing: 0 }));
     });
   }
 
